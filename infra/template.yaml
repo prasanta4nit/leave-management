@@ -1,0 +1,332 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  LeaveDesk - Leave & Employee Management.
+  React SPA on S3 + CloudFront, FastAPI on Lambda + API Gateway (HTTP API),
+  MySQL on RDS, auth via Cognito, email via SES, scheduled jobs via EventBridge.
+
+Parameters:
+  Stage:
+    Type: String
+    Default: prod
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for RDS and the Lambda function.
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: >
+      At least two private subnets in different AZs. They need a NAT gateway (or VPC endpoints for
+      Secrets Manager, SES and Cognito) so the Lambda can reach AWS APIs.
+  SenderEmail:
+    Type: String
+    Description: Verified SES sender, e.g. leave@yourcompany.com
+  SesIdentity:
+    Type: String
+    Description: SES identity to create & verify - your domain (recommended, e.g. yourcompany.com) or the sender email.
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+  DbAllocatedStorage:
+    Type: Number
+    Default: 20
+  Timezone:
+    Type: String
+    Default: Asia/Kolkata
+    Description: IANA timezone used for scheduled jobs.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    MemorySize: 512
+    Timeout: 29
+
+Resources:
+  # ---------------------------------------------------------------- Auth (Cognito)
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub leavedesk-${Stage}
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true # accounts are provisioned by HR from the app
+        InviteMessageTemplate:
+          EmailSubject: Your LeaveDesk account
+          EmailMessage: >-
+            Welcome to LeaveDesk! Sign in with username {username} and temporary password {####}.
+            You'll be asked to choose a new password. Your HR team will share the app link.
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          TemporaryPasswordValidityDays: 7
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: leavedesk-web
+      GenerateSecret: false
+      ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits: { AccessToken: hours, IdToken: hours, RefreshToken: days }
+
+  # ---------------------------------------------------------------- Email (SES)
+  SesEmailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref SesIdentity
+
+  # ---------------------------------------------------------------- Network + database
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: LeaveDesk Lambda
+      VpcId: !Ref VpcId
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: LeaveDesk MySQL - Lambda access only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: LeaveDesk DB subnets
+      SubnetIds: !Ref PrivateSubnetIds
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: mysql
+      EngineVersion: "8.4.11"
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: !Ref DbAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      DBName: leave_mgmt
+      MasterUsername: leavedesk
+      ManageMasterUserPassword: true # password lives in Secrets Manager, rotated by RDS
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups: [!Ref DbSecurityGroup]
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 7
+      DeletionProtection: true
+      AutoMinorVersionUpgrade: true
+
+  # ---------------------------------------------------------------- API (FastAPI on Lambda)
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        # Production traffic is same-origin via CloudFront (/api/*); CORS is only for local dev.
+        AllowOrigins:
+          - http://localhost:5173
+        AllowHeaders: [Authorization, Content-Type]
+        AllowMethods: [GET, POST, PUT, DELETE, OPTIONS]
+        ExposeHeaders: [Content-Disposition]
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub leavedesk-api-${Stage}
+      CodeUri: ../backend/build/ # produced by scripts/build-backend.sh
+      Handler: app.main.handler
+      VpcConfig:
+        SecurityGroupIds: [!Ref LambdaSecurityGroup]
+        SubnetIds: !Ref PrivateSubnetIds
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Stage
+          AUTH_MODE: cognito
+          COGNITO_REGION: !Ref AWS::Region
+          COGNITO_USER_POOL_ID: !Ref UserPool
+          COGNITO_APP_CLIENT_ID: !Ref UserPoolClient
+          DB_SECRET_ARN: !GetAtt Database.MasterUserSecret.SecretArn
+          DB_HOST: !GetAtt Database.Endpoint.Address
+          DB_PORT: !GetAtt Database.Endpoint.Port
+          DB_NAME: leave_mgmt
+          EMAIL_ENABLED: "true"
+          SES_REGION: !Ref AWS::Region
+          SES_SENDER: !Sub LeaveDesk <${SenderEmail}>
+          FRONTEND_URL_PARAM: !Sub /leavedesk/${Stage}/app-url
+          CORS_ORIGINS: http://localhost:5173
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [ses:SendEmail, ses:SendRawEmail]
+              Resource: "*"
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !GetAtt Database.MasterUserSecret.SecretArn
+            - Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/leavedesk/${Stage}/app-url
+            - Effect: Allow
+              Action: [cognito-idp:AdminCreateUser, cognito-idp:AdminEnableUser, cognito-idp:AdminDisableUser]
+              Resource: !GetAtt UserPool.Arn
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/{proxy+}
+            Method: ANY
+        DailyAccrual:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(15 0 * * ? *)
+            ScheduleExpressionTimezone: !Ref Timezone
+            Input: '{"job": "accrual"}'
+        ApprovalReminders:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(30 9 ? * MON-FRI *)
+            ScheduleExpressionTimezone: !Ref Timezone
+            Input: '{"job": "reminders"}'
+        YearEnd:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(30 0 1 1 ? *)
+            ScheduleExpressionTimezone: !Ref Timezone
+            Input: '{"job": "year-end"}'
+
+  AppUrlParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /leavedesk/${Stage}/app-url
+      Type: String
+      Value: !Sub https://${Distribution.DomainName}
+      Description: Public app URL used in email links
+
+  # ---------------------------------------------------------------- Frontend (S3 + CloudFront)
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub ${FrontendBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub leavedesk-oac-${Stage}
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # Rewrites client-side routes (e.g. /approvals) to index.html without touching /api/*.
+  SpaRewriteFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub leavedesk-spa-rewrite-${Stage}
+      AutoPublish: true
+      FunctionConfig:
+        Comment: SPA fallback to index.html
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var req = event.request;
+          if (!req.uri.includes('.')) { req.uri = '/index.html'; }
+          return req;
+        }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub LeaveDesk ${Stage}
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_200
+        Origins:
+          - Id: spa
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig: { OriginAccessIdentity: "" }
+          - Id: api
+            DomainName: !Sub ${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+        DefaultCacheBehavior:
+          TargetOriginId: spa
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt SpaRewriteFunction.FunctionMetadata.FunctionARN
+        CacheBehaviors:
+          # Same-origin API calls: no CORS round-trips from the browser.
+          - PathPattern: /api/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # Managed-CachingDisabled
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+
+Outputs:
+  AppUrl:
+    Description: LeaveDesk web app
+    Value: !Sub https://${Distribution.DomainName}
+  ApiUrl:
+    Description: Direct API Gateway URL
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/api
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  DistributionId:
+    Value: !Ref Distribution
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  ApiFunctionName:
+    Value: !Ref ApiFunction
+  DatabaseEndpoint:
+    Value: !GetAtt Database.Endpoint.Address

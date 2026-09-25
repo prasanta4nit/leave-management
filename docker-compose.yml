@@ -1,0 +1,17 @@
+# Local MySQL for development: docker compose up -d
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: leave_mgmt
+      MYSQL_USER: leave
+      MYSQL_PASSWORD: leave
+      MYSQL_ROOT_PASSWORD: root
+    ports: ["3306:3306"]
+    volumes: [mysql-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 10
+volumes:
+  mysql-data:
