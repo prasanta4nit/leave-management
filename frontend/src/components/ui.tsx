@@ -249,3 +249,13 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
     </label>
   );
 }
+
+/** Compact country code tag (emoji flags don't render on Windows). */
+export function CountryTag({ code, title }: { code: string | null | undefined; title?: string }) {
+  if (!code) return null;
+  return (
+    <span title={title ?? code} className="inline-flex shrink-0 items-center rounded bg-slate-100 px-1 py-px text-[10px] font-semibold tracking-wide text-slate-600 ring-1 ring-inset ring-slate-300/60">
+      {code}
+    </span>
+  );
+}

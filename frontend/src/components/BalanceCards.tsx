@@ -14,7 +14,11 @@ export default function BalanceCards({ balances, compact }: { balances: Balance[
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: b.color }} />
                 <span className="text-sm font-medium text-slate-700">{b.leave_type_name}</span>
               </div>
-              {!b.is_paid && <span className="text-[10px] font-semibold uppercase text-slate-400">Unpaid</span>}
+              {!b.applicable ? (
+                <span className="text-[10px] font-semibold uppercase text-amber-600" title="Not part of the current country policy; shown because it was used this year">Previous policy</span>
+              ) : (
+                !b.is_paid && <span className="text-[10px] font-semibold uppercase text-slate-400">Unpaid</span>
+              )}
             </div>
             <div className="mt-3 flex items-baseline gap-1">
               <span className="text-3xl font-semibold text-slate-900">{b.is_unlimited ? '∞' : round(b.available ?? 0)}</span>

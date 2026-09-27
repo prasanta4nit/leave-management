@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Button, Card, ErrorNote, Field, Modal, PageHeader, PersonCell, Spinner } from '../../components/ui';
+import { Button, Card, CountryTag, ErrorNote, Field, Modal, PageHeader, PersonCell, Spinner } from '../../components/ui';
 import { api } from '../../lib/api';
+import { countryName } from '../../lib/countries';
 import { useToast } from '../../lib/toast';
 import type { Balance, EmployeeBrief } from '../../lib/types';
 
@@ -11,8 +12,16 @@ export default function Balances() {
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(thisYear);
   const [adjust, setAdjust] = useState<{ employee: EmployeeBrief; balance: Balance } | null>(null);
+  const [country, setCountry] = useState('');
   const q = useQuery({ queryKey: ['balances-overview', year], queryFn: () => api.get<Row[]>(`/admin/stats/balances-overview?year=${year}`) });
-  const types = useMemo(() => (q.data?.[0]?.balances ?? []).filter((b) => !b.is_unlimited), [q.data]);
+  const rows = useMemo(() => (q.data ?? []).filter((r) => !country || r.employee.country_code === country), [q.data, country]);
+  // Columns = every limited leave type that applies to at least one employee shown
+  const types = useMemo(() => {
+    const seen = new Map<number, Balance>();
+    for (const r of rows) for (const b of r.balances) if (!b.is_unlimited && b.applicable && !seen.has(b.leave_type_id)) seen.set(b.leave_type_id, b);
+    return [...seen.values()];
+  }, [rows]);
+  const countries = useMemo(() => [...new Set((q.data ?? []).map((r) => r.employee.country_code).filter(Boolean))] as string[], [q.data]);
 
   return (
     <div>
@@ -20,9 +29,15 @@ export default function Balances() {
         title="Leave balances"
         subtitle="Available / credited per employee. Click a cell to adjust a balance (recorded in the audit log)."
         actions={
-          <select className="input w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {[thisYear + 1, thisYear, thisYear - 1].map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <>
+            <select className="input w-auto" value={country} onChange={(e) => setCountry(e.target.value)}>
+              <option value="">All countries</option>
+              {countries.map((c) => <option key={c} value={c}>{countryName(c)}</option>)}
+            </select>
+            <select className="input w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+              {[thisYear + 1, thisYear, thisYear - 1].map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </>
         }
       />
       <Card bodyClass="p-0">
@@ -35,16 +50,18 @@ export default function Balances() {
                   {types.map((t) => (
                     <th key={t.leave_type_id} className="table-th text-center">
                       <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} />{t.leave_type_name}</span>
+                      <div className="text-[10px] font-normal normal-case text-slate-400">{t.leave_type_code}</div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {q.data?.map((row) => (
+                {rows.map((row) => (
                   <tr key={row.employee.id}>
-                    <td className="table-td"><PersonCell person={row.employee} /></td>
+                    <td className="table-td"><PersonCell person={row.employee} sub={<span className="flex items-center gap-1.5"><CountryTag code={row.employee.country_code} />{row.employee.designation}</span>} /></td>
                     {types.map((t) => {
-                      const b = row.balances.find((x) => x.leave_type_id === t.leave_type_id)!;
+                      const b = row.balances.find((x) => x.leave_type_id === t.leave_type_id && x.applicable);
+                      if (!b) return <td key={t.leave_type_id} className="table-td text-center text-slate-300" title="Not in this employee's country policy">—</td>;
                       return (
                         <td key={t.leave_type_id} className="table-td text-center">
                           <button onClick={() => setAdjust({ employee: row.employee, balance: b })} className="rounded-md px-2 py-1 tabular-nums hover:bg-brand-50" title={`Used ${b.used}, pending ${b.pending}`}>

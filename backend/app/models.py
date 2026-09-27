@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
@@ -53,7 +54,6 @@ class RequestStatus(str, enum.Enum):
 class DurationType(str, enum.Enum):
     FULL_DAY = "FULL_DAY"
     HALF_DAY = "HALF_DAY"
-    HOURLY = "HOURLY"
 
 
 class HalfDaySession(str, enum.Enum):
@@ -119,6 +119,9 @@ class Employee(Base):
     joining_date: Mapped[date] = mapped_column(Date)
     exit_date: Mapped[date | None] = mapped_column(Date)
     location: Mapped[str | None] = mapped_column(String(100))
+    country_code: Mapped[str | None] = mapped_column(String(2), index=True)  # ISO 3166-1 alpha-2
+    # Explicit override; when empty the calendar is resolved from country_code (see services/calendars.py).
+    holiday_calendar_id: Mapped[int | None] = mapped_column(ForeignKey("holiday_calendars.id", ondelete="SET NULL"))
     address: Mapped[str | None] = mapped_column(String(255))
     emergency_contact_name: Mapped[str | None] = mapped_column(String(100))
     emergency_contact_phone: Mapped[str | None] = mapped_column(String(30))
@@ -128,6 +131,7 @@ class Employee(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
     designation: Mapped[Designation | None] = relationship()
+    holiday_calendar: Mapped[HolidayCalendar | None] = relationship()
     department: Mapped[Department | None] = relationship(foreign_keys=[department_id])
     manager: Mapped[Employee | None] = relationship(remote_side=[id], back_populates="reports")
     reports: Mapped[list[Employee]] = relationship(back_populates="manager")
@@ -161,11 +165,12 @@ class LeaveType(Base):
     carry_forward_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     max_carry_forward: Mapped[Decimal] = mapped_column(Numeric(6, 2), default=0)
     allow_half_day: Mapped[bool] = mapped_column(Boolean, default=True)
-    allow_hourly: Mapped[bool] = mapped_column(Boolean, default=False)
     allow_negative_balance: Mapped[bool] = mapped_column(Boolean, default=False)
     allow_backdated: Mapped[bool] = mapped_column(Boolean, default=False)
     min_notice_days: Mapped[int] = mapped_column(Integer, default=0)
     max_consecutive_days: Mapped[int | None] = mapped_column(Integer)
+    # ISO country codes this leave type/policy applies to. NULL or [] = every country.
+    country_codes: Mapped[list[str] | None] = mapped_column(JSON)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -219,7 +224,6 @@ class LeaveRequest(ApprovalMixin, Base):
     end_date: Mapped[date] = mapped_column(Date)
     duration_type: Mapped[str] = mapped_column(String(20), default=DurationType.FULL_DAY.value)
     half_day_session: Mapped[str | None] = mapped_column(String(20))
-    hours: Mapped[Decimal | None] = mapped_column(Numeric(4, 2))
     total_days: Mapped[Decimal] = mapped_column(Numeric(6, 2))
     reason: Mapped[str | None] = mapped_column(String(1000))
 
@@ -264,15 +268,33 @@ class RequestHistory(Base):
     actor: Mapped[Employee | None] = relationship()
 
 
-class Holiday(Base):
-    __tablename__ = "holidays"
-    __table_args__ = (UniqueConstraint("date", "name", name="uq_holiday"),)
+class HolidayCalendar(Base):
+    """A country/location holiday calendar with its own weekend days."""
+
+    __tablename__ = "holiday_calendars"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    country_code: Mapped[str | None] = mapped_column(String(2), index=True)
+    description: Mapped[str | None] = mapped_column(String(255))
+    # Python weekday numbers (Mon=0 .. Sun=6). NULL = use the company-wide weekend setting.
+    weekend_days: Mapped[list[int] | None] = mapped_column(JSON)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Holiday(Base):
+    __tablename__ = "holidays"
+    __table_args__ = (UniqueConstraint("calendar_id", "date", "name", name="uq_holiday"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    calendar_id: Mapped[int] = mapped_column(ForeignKey("holiday_calendars.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(100))
     date: Mapped[date] = mapped_column(Date, index=True)
     is_optional: Mapped[bool] = mapped_column(Boolean, default=False)
     description: Mapped[str | None] = mapped_column(String(255))
+
+    calendar: Mapped[HolidayCalendar] = relationship()
 
 
 class OptionalHolidaySelection(Base):

@@ -20,6 +20,8 @@ from ..models import (
     LeaveType,
     RequestStatus,
 )
+from . import calendars
+
 
 ZERO = Decimal("0")
 
@@ -131,11 +133,35 @@ def ensure_balance(db: Session, emp: Employee, lt: LeaveType, year: int, today: 
     return bal
 
 
-def balance_summary(db: Session, emp: Employee, lt: LeaveType, year: int) -> dict:
-    bal = ensure_balance(db, emp, lt, year)
+def applies_to_country(lt: LeaveType, country: str | None) -> bool:
+    return not lt.country_codes or (country is not None and country in lt.country_codes)
+
+
+def applies_to(db: Session, lt: LeaveType, emp: Employee) -> bool:
+    return applies_to_country(lt, calendars.employee_country(db, emp))
+
+
+def applicable_types(db: Session, emp: Employee) -> list[LeaveType]:
+    country = calendars.employee_country(db, emp)
+    types = db.scalars(select(LeaveType).where(LeaveType.is_active.is_(True)).order_by(LeaveType.sort_order, LeaveType.name))
+    return [lt for lt in types if applies_to_country(lt, country)]
+
+
+def balance_summary(db: Session, emp: Employee, lt: LeaveType, year: int, applicable: bool = True) -> dict:
     used, pending = used_and_pending(db, emp.id, lt.id, year)
+    if applicable:
+        bal = ensure_balance(db, emp, lt, year)
+    else:
+        # Not part of the employee's country policy (e.g. they moved country): never create or
+        # accrue a balance, just report whatever already exists.
+        bal = db.scalar(
+            select(LeaveBalance).where(
+                LeaveBalance.employee_id == emp.id, LeaveBalance.leave_type_id == lt.id, LeaveBalance.year == year
+            )
+        ) or LeaveBalance(allocated=ZERO, accrued=ZERO, carried_forward=ZERO, adjusted=ZERO)
     credited = bal.credited
     return {
+        "applicable": applicable,
         "leave_type_id": lt.id,
         "leave_type_code": lt.code,
         "leave_type_name": lt.name,
@@ -156,8 +182,16 @@ def balance_summary(db: Session, emp: Employee, lt: LeaveType, year: int) -> dic
 
 
 def employee_balances(db: Session, emp: Employee, year: int) -> list[dict]:
+    """Balances for the leave types of the employee's country, plus any other type they used that year."""
+    country = calendars.employee_country(db, emp)
     types = db.scalars(select(LeaveType).where(LeaveType.is_active.is_(True)).order_by(LeaveType.sort_order, LeaveType.name))
-    return [balance_summary(db, emp, lt, year) for lt in types]
+    result = []
+    for lt in types:
+        if applies_to_country(lt, country):
+            result.append(balance_summary(db, emp, lt, year))
+        elif sum(used_and_pending(db, emp.id, lt.id, year)) > 0:
+            result.append(balance_summary(db, emp, lt, year, applicable=False))
+    return result
 
 
 def available_days(db: Session, emp: Employee, lt: LeaveType, year: int, exclude_request_id: int | None = None) -> Decimal:
@@ -181,10 +215,9 @@ def run_accruals(db: Session, today: date | None = None) -> int:
     """Idempotent: creates missing balances for the year and credits any due accrual periods."""
     today = today or date.today()
     employees = db.scalars(select(Employee).where(Employee.status == EmployeeStatus.ACTIVE.value)).all()
-    types = db.scalars(select(LeaveType).where(LeaveType.is_active.is_(True))).all()
     count = 0
     for emp in employees:
-        for lt in types:
+        for lt in applicable_types(db, emp):
             ensure_balance(db, emp, lt, today.year, today)
             count += 1
     return count
@@ -193,10 +226,9 @@ def run_accruals(db: Session, today: date | None = None) -> int:
 def recompute_carry_forward(db: Session, year: int) -> int:
     """Year-end processing: (re)calculate carry-forward into `year` from `year - 1` usage."""
     employees = db.scalars(select(Employee).where(Employee.status == EmployeeStatus.ACTIVE.value)).all()
-    types = db.scalars(select(LeaveType).where(LeaveType.is_active.is_(True))).all()
     updated = 0
     for emp in employees:
-        for lt in types:
+        for lt in applicable_types(db, emp):
             bal = ensure_balance(db, emp, lt, year)
             cf = compute_carry_forward(db, emp, lt, year)
             if Decimal(bal.carried_forward) != cf:

@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { Briefcase, Calendar, Mail, MapPin, Phone, User } from 'lucide-react';
+import { Briefcase, Calendar, CalendarHeart, Globe, Mail, MapPin, Phone, User } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import BalanceCards from '../components/BalanceCards';
 import RequestTable from '../components/RequestTable';
-import { Avatar, Badge, Card, EmptyState, ErrorNote, PersonCell, Spinner } from '../components/ui';
+import { Avatar, Badge, Card, CountryTag, EmptyState, ErrorNote, PersonCell, Spinner } from '../components/ui';
 import { api } from '../lib/api';
 import { useMe } from '../lib/auth';
+import { countryName } from '../lib/countries';
 import { fmtDate, titleCase } from '../lib/format';
 import type { Balance, Employee, EmployeeBrief, LeaveRequest } from '../lib/types';
 
@@ -66,7 +67,16 @@ export default function EmployeeProfile({ employeeId }: { employeeId?: number })
               {e.manager ? <Link to={`/employees/${e.manager.id}`} className="text-brand-600 hover:underline">{e.manager.full_name}</Link> : '—'}
             </Row>
             <Row icon={<Calendar className="h-4 w-4" />} label="Joined">{fmtDate(e.joining_date)}</Row>
-            <Row icon={<MapPin className="h-4 w-4" />} label="Location">{e.location ?? '—'}</Row>
+            <Row icon={<Globe className="h-4 w-4" />} label="Country">
+              <span className="flex items-center gap-1.5"><CountryTag code={e.country_code} />{countryName(e.country_code)}{e.location ? ` · ${e.location}` : ''}</span>
+            </Row>
+            <Row icon={<CalendarHeart className="h-4 w-4" />} label="Holiday calendar">
+              {e.holiday_calendar ? (
+                <Link to="/holidays" className="text-brand-600 hover:underline">
+                  {e.holiday_calendar.name}{e.holiday_calendar_id ? ' (assigned by HR)' : ''}
+                </Link>
+              ) : '—'}
+            </Row>
             {canSeePrivate && (
               <>
                 <Row icon={<User className="h-4 w-4" />} label="Date of birth">{fmtDate(e.date_of_birth)}</Row>

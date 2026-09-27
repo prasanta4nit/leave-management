@@ -12,7 +12,6 @@ from ..models import SystemSetting
 DEFAULTS: dict[str, Any] = {
     "company_name": "Acme Technologies",
     "timezone": "Asia/Kolkata",
-    "work_hours_per_day": 8,
     "weekend_days": [5, 6],  # Python weekday(): Mon=0 ... Sat=5, Sun=6
     "leave_approval_flow": "MANAGER",
     "wfh_approval_flow": "MANAGER",

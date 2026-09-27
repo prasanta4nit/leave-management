@@ -1,7 +1,7 @@
 export type Role = 'EMPLOYEE' | 'HR' | 'ADMIN';
 export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export type RequestKind = 'LEAVE' | 'WFH';
-export type DurationType = 'FULL_DAY' | 'HALF_DAY' | 'HOURLY';
+export type DurationType = 'FULL_DAY' | 'HALF_DAY';
 
 export interface EmployeeBrief {
   id: number;
@@ -14,6 +14,7 @@ export interface EmployeeBrief {
   designation: string | null;
   department: string | null;
   department_id: number | null;
+  country_code: string | null;
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -26,6 +27,8 @@ export interface Employee extends EmployeeBrief {
   employment_type: 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'INTERN';
   joining_date: string;
   location: string | null;
+  holiday_calendar_id: number | null; // explicit override (null = follow country)
+  holiday_calendar?: HolidayCalendarBrief | null; // effective calendar (profile / me only)
   bio: string | null;
   direct_report_count: number;
   is_manager?: boolean;
@@ -42,7 +45,7 @@ export interface Me extends Employee {
   is_manager: boolean;
   is_hr: boolean;
   is_admin: boolean;
-  settings: { company_name: string; work_hours_per_day: number; weekend_days: number[]; max_optional_holidays: number };
+  settings: { company_name: string; weekend_days: number[]; max_optional_holidays: number };
 }
 
 export interface OrgNode extends EmployeeBrief {
@@ -80,16 +83,17 @@ export interface LeaveType {
   carry_forward_enabled: boolean;
   max_carry_forward: number;
   allow_half_day: boolean;
-  allow_hourly: boolean;
   allow_negative_balance: boolean;
   allow_backdated: boolean;
   min_notice_days: number;
   max_consecutive_days: number | null;
+  country_codes: string[]; // empty = all countries
   is_active: boolean;
   sort_order: number;
 }
 
 export interface Balance {
+  applicable: boolean; // false = not in the employee's country policy (shown because it was used)
   leave_type_id: number;
   leave_type_code: string;
   leave_type_name: string;
@@ -138,7 +142,6 @@ export interface LeaveRequest extends ApprovalFields {
   leave_type: { id: number; code: string; name: string; color: string };
   duration_type: DurationType;
   half_day_session: 'FIRST_HALF' | 'SECOND_HALF' | null;
-  hours: number | null;
 }
 
 export interface WfhRequest extends ApprovalFields {
@@ -161,6 +164,20 @@ export interface HistoryEntry {
   request?: AnyRequest;
 }
 
+export interface HolidayCalendarBrief {
+  id: number;
+  name: string;
+  country_code: string | null;
+}
+
+export interface HolidayCalendar extends HolidayCalendarBrief {
+  description: string | null;
+  weekend_days: number[] | null; // null = company default
+  is_default: boolean;
+  holiday_count: number | null;
+  employee_count: number | null;
+}
+
 export interface Holiday {
   id: number;
   name: string;
@@ -168,7 +185,11 @@ export interface Holiday {
   is_optional: boolean;
   description: string | null;
   weekday: string;
+  calendar_id: number;
+  calendar_name: string | null;
+  country_code: string | null;
   opted_in?: boolean;
+  members_affected?: number;
 }
 
 export interface CalendarData {
@@ -176,6 +197,7 @@ export interface CalendarData {
   end: string;
   weekend_days: number[];
   holidays: Holiday[];
+  calendars: HolidayCalendarBrief[];
   leaves: LeaveRequest[];
   wfh: WfhRequest[];
   members: number;
@@ -195,7 +217,6 @@ export interface ReportResult {
 export type Settings = Record<string, unknown> & {
   company_name: string;
   timezone: string;
-  work_hours_per_day: number;
   weekend_days: number[];
   leave_approval_flow: string;
   wfh_approval_flow: string;

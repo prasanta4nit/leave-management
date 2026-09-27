@@ -27,7 +27,6 @@ export function dateRange(r: { start_date: string; end_date: string }) {
 
 export function durationLabel(r: LeaveRequest) {
   if (r.duration_type === 'HALF_DAY') return `Half day (${r.half_day_session === 'FIRST_HALF' ? '1st half' : '2nd half'})`;
-  if (r.duration_type === 'HOURLY') return `${r.hours} hours`;
   return fmtDays(r.total_days);
 }
 

@@ -10,7 +10,7 @@ from ..auth import get_current_user, require_hr
 from ..database import get_db
 from ..models import Department, Designation, Employee, LeaveRequest, LeaveType
 from ..schemas import DepartmentIn, DesignationIn, LeaveTypeIn
-from ..services import audit
+from ..services import audit, balances, calendars
 
 router = APIRouter(tags=["catalog"])
 
@@ -111,11 +111,26 @@ def delete_designation(des_id: int, db: Session = Depends(get_db), user: Employe
 # ---- Leave types / policies --------------------------------------------------
 
 @router.get("/leave-types")
-def list_leave_types(include_inactive: bool = False, db: Session = Depends(get_db), _: Employee = Depends(get_current_user)):
+def list_leave_types(
+    include_inactive: bool = False,
+    employee_id: int | None = None,
+    country_code: str | None = None,
+    db: Session = Depends(get_db),
+    user: Employee = Depends(get_current_user),
+):
+    """All leave types, or only those applicable to an employee (`employee_id`) / a country."""
     stmt = select(LeaveType).order_by(LeaveType.sort_order, LeaveType.name)
     if not include_inactive:
         stmt = stmt.where(LeaveType.is_active.is_(True))
-    return [S.leave_type(t) for t in db.scalars(stmt)]
+    types = list(db.scalars(stmt))
+    if employee_id is not None:
+        emp = db.get(Employee, employee_id)
+        if emp is None:
+            raise HTTPException(404, "Employee not found")
+        country_code = calendars.employee_country(db, emp)
+    if employee_id is not None or country_code:
+        types = [t for t in types if balances.applies_to_country(t, (country_code or "").upper() or None)]
+    return [S.leave_type(t) for t in types]
 
 
 @router.post("/leave-types", status_code=201)

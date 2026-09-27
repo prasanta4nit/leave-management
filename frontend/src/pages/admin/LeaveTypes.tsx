@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Badge, Button, Card, ErrorNote, Field, Modal, PageHeader, Spinner, Toggle } from '../../components/ui';
+import clsx from 'clsx';
+import { Badge, Button, Card, CountryTag, ErrorNote, Field, Modal, PageHeader, Spinner, Toggle } from '../../components/ui';
 import { api } from '../../lib/api';
+import { COUNTRIES, countryName } from '../../lib/countries';
 import { titleCase } from '../../lib/format';
 import { useToast } from '../../lib/toast';
 import type { LeaveType } from '../../lib/types';
@@ -10,14 +12,15 @@ import type { LeaveType } from '../../lib/types';
 const BLANK: Omit<LeaveType, 'id'> = {
   code: '', name: '', description: '', color: '#6366f1', is_paid: true, is_unlimited: false, annual_quota: 12,
   accrual_frequency: 'YEARLY', prorate_on_joining: true, carry_forward_enabled: false, max_carry_forward: 0,
-  allow_half_day: true, allow_hourly: false, allow_negative_balance: false, allow_backdated: false, min_notice_days: 0,
-  max_consecutive_days: null, is_active: true, sort_order: 10,
+  allow_half_day: true, allow_negative_balance: false, allow_backdated: false, min_notice_days: 0,
+  max_consecutive_days: null, country_codes: [], is_active: true, sort_order: 10,
 };
 
 export default function LeaveTypes() {
   const toast = useToast();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<LeaveType | 'new' | null>(null);
+  const [country, setCountry] = useState('');
   const q = useQuery({ queryKey: ['leave-types', 'all'], queryFn: () => api.get<LeaveType[]>('/leave-types?include_inactive=true') });
   const remove = useMutation({
     mutationFn: (t: LeaveType) => api.del<{ action: string }>(`/leave-types/${t.id}`),
@@ -30,7 +33,19 @@ export default function LeaveTypes() {
 
   return (
     <div>
-      <PageHeader title="Leave types & policies" subtitle="Quotas, accrual, carry-forward and application rules" actions={<Button onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> Add leave type</Button>} />
+      <PageHeader
+        title="Leave types & policies"
+        subtitle="Each leave type applies to specific countries (or all). Employees only see the types for their country."
+        actions={
+          <>
+            <select className="input w-auto" value={country} onChange={(e) => setCountry(e.target.value)}>
+              <option value="">All countries</option>
+              {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+            </select>
+            <Button onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> Add leave type</Button>
+          </>
+        }
+      />
       {q.isLoading ? <Spinner /> : (
         <Card bodyClass="p-0">
           <div className="overflow-x-auto">
@@ -38,6 +53,7 @@ export default function LeaveTypes() {
               <thead className="bg-slate-50/60">
                 <tr>
                   <th className="table-th">Leave type</th>
+                  <th className="table-th">Countries</th>
                   <th className="table-th">Quota</th>
                   <th className="table-th">Accrual</th>
                   <th className="table-th">Carry forward</th>
@@ -47,7 +63,7 @@ export default function LeaveTypes() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {q.data?.map((t) => (
+                {q.data?.filter((t) => !country || !t.country_codes.length || t.country_codes.includes(country)).map((t) => (
                   <tr key={t.id} className={t.is_active ? '' : 'opacity-50'}>
                     <td className="table-td">
                       <div className="flex items-center gap-2">
@@ -60,10 +76,17 @@ export default function LeaveTypes() {
                         {!t.is_active && <Badge>Inactive</Badge>}
                       </div>
                     </td>
+                    <td className="table-td">
+                      {t.country_codes.length ? (
+                        <span className="flex flex-wrap gap-1">{t.country_codes.map((c) => <CountryTag key={c} code={c} title={countryName(c)} />)}</span>
+                      ) : (
+                        <span className="text-xs text-slate-500">All countries</span>
+                      )}
+                    </td>
                     <td className="table-td">{t.is_unlimited ? 'Unlimited' : `${t.annual_quota} / yr`}</td>
                     <td className="table-td">{t.is_unlimited ? '—' : titleCase(t.accrual_frequency)}</td>
                     <td className="table-td">{t.carry_forward_enabled ? `Up to ${t.max_carry_forward}` : 'No'}</td>
-                    <td className="table-td text-xs">{[t.allow_half_day && 'Half-day', t.allow_hourly && 'Hourly', t.allow_backdated && 'Backdated', t.allow_negative_balance && 'Negative'].filter(Boolean).join(', ') || '—'}</td>
+                    <td className="table-td text-xs">{[t.allow_half_day && 'Half-day', t.allow_backdated && 'Backdated', t.allow_negative_balance && 'Negative'].filter(Boolean).join(', ') || '—'}</td>
                     <td className="table-td text-xs">{[t.min_notice_days ? `${t.min_notice_days}d notice` : null, t.max_consecutive_days ? `max ${t.max_consecutive_days}d` : null].filter(Boolean).join(', ') || '—'}</td>
                     <td className="table-td whitespace-nowrap text-right">
                       <Button size="sm" variant="ghost" onClick={() => setEditing(t)} aria-label="Edit"><Pencil className="h-4 w-4" /></Button>
@@ -114,6 +137,35 @@ function LeaveTypeModal({ value, onClose }: { value: LeaveType | 'new' | null; o
             <Field label="Code"><input className="input" value={f.code} onChange={(e) => set('code', e.target.value.toUpperCase())} /></Field>
           </div>
           <Field label="Description"><input className="input" value={f.description ?? ''} onChange={(e) => set('description', e.target.value)} /></Field>
+          <div>
+            <span className="label">Applies to</span>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => set('country_codes', [])}
+                className={clsx('rounded-lg border px-2.5 py-1 text-xs font-medium', !f.country_codes.length ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 text-slate-600')}
+              >
+                All countries
+              </button>
+              {COUNTRIES.map((c) => {
+                const on = f.country_codes.includes(c.code);
+                return (
+                  <button
+                    type="button"
+                    key={c.code}
+                    title={c.name}
+                    onClick={() => set('country_codes', on ? f.country_codes.filter((x) => x !== c.code) : [...f.country_codes, c.code].sort())}
+                    className={clsx('rounded-lg border px-2.5 py-1 text-xs font-medium', on ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 text-slate-600')}
+                  >
+                    {c.code}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              Use separate leave types when a country needs a different quota or rules (e.g. Annual Leave for India vs Israel).
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Colour"><input type="color" className="input h-10 p-1" value={f.color} onChange={(e) => set('color', e.target.value)} /></Field>
             <Field label="Sort order"><input type="number" className="input" value={f.sort_order} onChange={(e) => set('sort_order', Number(e.target.value))} /></Field>
@@ -143,7 +195,6 @@ function LeaveTypeModal({ value, onClose }: { value: LeaveType | 'new' | null; o
           <Toggle label="Pro-rate for new joiners" checked={f.prorate_on_joining} onChange={(v) => set('prorate_on_joining', v)} />
           <Toggle label="Carry forward unused days" checked={f.carry_forward_enabled} onChange={(v) => set('carry_forward_enabled', v)} />
           <Toggle label="Allow half-day" checked={f.allow_half_day} onChange={(v) => set('allow_half_day', v)} />
-          <Toggle label="Allow hourly" checked={f.allow_hourly} onChange={(v) => set('allow_hourly', v)} />
           <Toggle label="Allow past dates" checked={f.allow_backdated} onChange={(v) => set('allow_backdated', v)} />
           <Toggle label="Allow negative balance" checked={f.allow_negative_balance} onChange={(v) => set('allow_negative_balance', v)} />
         </div>

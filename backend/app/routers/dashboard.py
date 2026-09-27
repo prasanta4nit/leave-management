@@ -18,7 +18,7 @@ from ..models import (
     RequestStatus,
     WfhRequest,
 )
-from ..services import balances
+from ..services import balances, calendars
 from .approvals import pending_for
 from .calendar import team_ids
 from .leaves import calendar_entries
@@ -42,8 +42,6 @@ def _todays_status(db: Session, ids: set[int], day: date) -> dict[int, dict]:
         label = r.leave_type.name
         if r.duration_type == "HALF_DAY":
             label += " (½ day)"
-        elif r.duration_type == "HOURLY":
-            label += f" ({float(r.hours):g}h)"
         status[r.employee_id] = {"presence": "ON_LEAVE", "label": label, "color": r.leave_type.color}
     for w in db.scalars(
         select(WfhRequest).where(
@@ -70,7 +68,14 @@ def employee_dashboard(db: Session = Depends(get_db), user: Employee = Depends(g
         .order_by(LeaveRequest.start_date)
         .limit(5)
     ).all()
-    holidays = db.scalars(select(Holiday).where(Holiday.date >= today).order_by(Holiday.date).limit(5)).all()
+    cal = calendars.calendar_for(db, user)
+    holidays = db.scalars(
+        select(Holiday)
+        .options(selectinload(Holiday.calendar))
+        .where(Holiday.date >= today, Holiday.calendar_id == (cal.id if cal else 0))
+        .order_by(Holiday.date)
+        .limit(5)
+    ).all()
 
     recent: list[dict] = []
     for r in db.scalars(
@@ -166,7 +171,10 @@ def admin_dashboard(db: Session = Depends(get_db), user: Employee = Depends(requ
         by_leave_type[types[r.leave_type_id].name] += float(r.total_days)
         monthly[r.start_date.month] += float(r.total_days)
 
-    holidays = db.scalars(select(Holiday).where(Holiday.date >= today).order_by(Holiday.date).limit(5)).all()
+    # Upcoming holidays across every country calendar, tagged with the calendar.
+    holidays = db.scalars(
+        select(Holiday).options(selectinload(Holiday.calendar)).where(Holiday.date >= today).order_by(Holiday.date).limit(8)
+    ).all()
     recent_audit = db.scalars(
         select(AuditLog).options(selectinload(AuditLog.actor)).order_by(AuditLog.created_at.desc()).limit(8)
     ).all()

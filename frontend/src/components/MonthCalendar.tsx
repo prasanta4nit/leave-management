@@ -3,6 +3,7 @@ import { addDays, endOfMonth, endOfWeek, format, isSameMonth, isToday, startOfMo
 import { useState } from 'react';
 import { isoDate } from '../lib/format';
 import type { CalendarData, RequestKind } from '../lib/types';
+import { CountryTag } from './ui';
 import RequestDetailModal from './RequestDetailModal';
 
 /** Month grid showing holidays, leave and WFH entries. */
@@ -17,7 +18,8 @@ export default function MonthCalendar({ month, data, onDayClick }: {
   const days: Date[] = [];
   for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) days.push(d);
 
-  // Python weekday numbers (Mon=0) -> JS getDay (Sun=0)
+  const multiCountry = (data?.calendars.length ?? 0) > 1;
+  // Viewer's weekend. Python weekday numbers (Mon=0) -> JS getDay (Sun=0)
   const weekend = new Set((data?.weekend_days ?? [5, 6]).map((w) => (w + 1) % 7));
 
   const entriesFor = (iso: string) => {
@@ -39,7 +41,8 @@ export default function MonthCalendar({ month, data, onDayClick }: {
           const iso = isoDate(d);
           const { holidays, leaves, wfh } = entriesFor(iso);
           const off = weekend.has(d.getDay());
-          const mandatoryHoliday = holidays.some((h) => !h.is_optional);
+          // Only shade the day when it's a holiday in every calendar shown
+      const mandatoryHoliday = holidays.some((h) => !h.is_optional) && !multiCountry;
           const items = [
             ...leaves.map((l) => ({
               key: `l${l.id}`,
@@ -83,13 +86,16 @@ export default function MonthCalendar({ month, data, onDayClick }: {
                 {holidays.map((h) => (
                   <div
                     key={h.id}
-                    title={h.name + (h.is_optional ? ' (optional)' : '')}
+                    title={`${h.name}${h.is_optional ? ' (optional)' : ''} — ${h.calendar_name ?? ''} calendar${
+                      h.members_affected !== undefined ? `, ${h.members_affected} people in view` : ''
+                    }`}
                     className={clsx(
-                      'truncate rounded px-1.5 py-0.5 text-[11px] font-medium',
+                      'flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[11px] font-medium',
                       h.is_optional ? 'border border-dashed border-rose-300 text-rose-600' : 'bg-rose-100 text-rose-700',
                     )}
                   >
-                    {h.name}
+                    {multiCountry && <CountryTag code={h.country_code} />}
+                    <span className="truncate">{h.name}</span>
                   </div>
                 ))}
                 {items.slice(0, 3).map((i) => (

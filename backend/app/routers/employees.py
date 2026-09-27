@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session, selectinload
 from .. import serializers as S
 from ..auth import can_view_private, get_current_user, is_manager, require_hr
 from ..database import get_db
-from ..models import Employee, EmployeeStatus, LeaveRequest
+from ..models import Employee, EmployeeStatus, HolidayCalendar, LeaveRequest
 from ..schemas import EmployeeCreate, EmployeeUpdate, SelfProfileUpdate
-from ..services import audit, balances, cognito
+from ..services import audit, balances, calendars, cognito
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 
@@ -47,6 +47,11 @@ def _check_manager(db: Session, employee_id: int | None, manager_id: int | None)
         cur = cur.manager
 
 
+def _check_calendar(db: Session, calendar_id: int | None) -> None:
+    if calendar_id is not None and db.get(HolidayCalendar, calendar_id) is None:
+        raise HTTPException(400, "Holiday calendar not found")
+
+
 @router.get("")
 def list_employees(
     q: str | None = None,
@@ -54,6 +59,7 @@ def list_employees(
     designation_id: int | None = None,
     manager_id: int | None = None,
     role: str | None = None,
+    country_code: str | None = None,
     status: str | None = Query(default="ACTIVE"),
     db: Session = Depends(get_db),
     user: Employee = Depends(get_current_user),
@@ -69,6 +75,8 @@ def list_employees(
         stmt = stmt.where(Employee.manager_id == manager_id)
     if role:
         stmt = stmt.where(Employee.role == role)
+    if country_code:
+        stmt = stmt.where(Employee.country_code == country_code.upper())
     if q:
         like = f"%{q.lower()}%"
         stmt = stmt.where(
@@ -114,7 +122,11 @@ def update_my_profile(body: SelfProfileUpdate, db: Session = Depends(get_db), us
 @router.get("/{employee_id}")
 def get_employee(employee_id: int, db: Session = Depends(get_db), user: Employee = Depends(get_current_user)):
     emp = _get(db, employee_id)
-    return {**S.employee(emp, private=can_view_private(db, user, emp.id)), "is_manager": is_manager(db, emp)}
+    return {
+        **S.employee(emp, private=can_view_private(db, user, emp.id)),
+        "is_manager": is_manager(db, emp),
+        "holiday_calendar": calendars.brief(calendars.calendar_for(db, emp)),
+    }
 
 
 @router.get("/{employee_id}/team")
@@ -176,6 +188,7 @@ def create_employee(body: EmployeeCreate, db: Session = Depends(get_db), user: E
     if body.role.value == "ADMIN" and not user.is_admin:
         raise HTTPException(403, "Only admins can create admin users")
     _check_manager(db, None, body.manager_id)
+    _check_calendar(db, body.holiday_calendar_id)
     data = body.model_dump(exclude={"send_invite", "employee_code"})
     data["role"] = body.role.value
     data["employment_type"] = body.employment_type.value
@@ -185,7 +198,8 @@ def create_employee(body: EmployeeCreate, db: Session = Depends(get_db), user: E
         code = f"EMP{next_id:03d}"
     if db.scalar(select(Employee).where(Employee.employee_code == code)):
         raise HTTPException(409, "Employee code already in use")
-    emp = Employee(**data, employee_code=code, email=body.email.lower())
+    data["email"] = body.email.lower()
+    emp = Employee(**data, employee_code=code)
     db.add(emp)
     db.flush()
     if body.send_invite:
@@ -203,6 +217,8 @@ def update_employee(
     changes = body.model_dump(exclude_unset=True)
     if "manager_id" in changes:
         _check_manager(db, emp.id, changes["manager_id"])
+    if "holiday_calendar_id" in changes:
+        _check_calendar(db, changes["holiday_calendar_id"])
     if "role" in changes and changes["role"] is not None:
         changes["role"] = changes["role"].value
         if (changes["role"] == "ADMIN" or emp.is_admin) and not user.is_admin:

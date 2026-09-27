@@ -75,8 +75,6 @@ def _describe(db: Session, kind: str, req) -> list[tuple[str, str]]:
         duration = _fmt_days(req.total_days)
         if req.duration_type == "HALF_DAY":
             duration += f" ({(req.half_day_session or '').replace('_', ' ').title()})"
-        elif req.duration_type == "HOURLY":
-            duration += f" ({float(req.hours):g} hours)"
         rows += [("Leave type", lt.name), ("Dates", dates), ("Duration", duration)]
     else:
         dates = req.start_date.strftime("%a, %d %b %Y")

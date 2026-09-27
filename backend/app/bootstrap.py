@@ -4,7 +4,8 @@ Invoke the Lambda with:
   {"job": "bootstrap", "admin_email": "you@company.com", "admin_first_name": "Asha", "admin_last_name": "Rao",
    "company_name": "Your Company"}
 
-Creates tables, default leave policies and the first Admin employee (plus their Cognito login).
+Creates tables, default leave policies, the India / Israel / Ukraine holiday calendars and the
+first Admin employee (plus their Cognito login).
 Safe to re-run: existing rows are left alone.
 """
 
@@ -14,6 +15,7 @@ from sqlalchemy import select
 
 from .database import SessionLocal
 from .db_init import create_all
+from .holiday_data import install as install_calendars
 from .models import Department, Designation, Employee, LeaveType
 from .seed import LEAVE_TYPES
 from .services import cognito, settings_service
@@ -27,6 +29,7 @@ def bootstrap(event: dict) -> dict:
         if not db.scalar(select(LeaveType).limit(1)):
             db.add_all(LeaveType(**t) for t in LEAVE_TYPES)
             result["leave_types"] = len(LEAVE_TYPES)
+        result["holiday_calendars"] = sorted(install_calendars(db))
         if event.get("company_name"):
             settings_service.update(db, {"company_name": event["company_name"]})
 
@@ -45,6 +48,7 @@ def bootstrap(event: dict) -> dict:
                 joining_date=date.fromisoformat(event["joining_date"]) if event.get("joining_date") else date.today(),
                 department_id=dept.id,
                 designation_id=desig.id,
+                country_code=(event.get("admin_country") or "IN").upper(),
             )
             db.add(admin)
             db.flush()

@@ -92,18 +92,18 @@ def utilization(
     """Per employee, per leave type: credited, used, pending, available and utilization %."""
     year = year or date.today().year
     scope = _scope(db, user)
-    types = list(db.scalars(select(LeaveType).where(LeaveType.is_active.is_(True)).order_by(LeaveType.sort_order)))
     rows = []
     for emp in _employees(db, scope, department_id):
-        for lt in types:
-            b = balances.balance_summary(db, emp, lt, year)
+        for b in balances.employee_balances(db, emp, year):
             credited = b["credited"]
             rows.append(
                 {
                     "employee_code": emp.employee_code,
                     "employee": emp.full_name,
+                    "country": emp.country_code or "",
                     "department": emp.department.name if emp.department else "",
-                    "leave_type": lt.name,
+                    "leave_type": b["leave_type_name"],
+                    "leave_type_code": b["leave_type_code"],
                     "carried_forward": b["carried_forward"],
                     "credited": credited,
                     "used": b["used"],
@@ -116,8 +116,10 @@ def utilization(
     cols = [
         ("employee_code", "Code"),
         ("employee", "Employee"),
+        ("country", "Country"),
         ("department", "Department"),
         ("leave_type", "Leave type"),
+        ("leave_type_code", "Type code"),
         ("carried_forward", "Carried forward"),
         ("credited", "Credited"),
         ("used", "Used"),

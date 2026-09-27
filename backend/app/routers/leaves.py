@@ -10,7 +10,7 @@ from ..auth import can_view_private, get_current_user, subordinate_ids
 from ..database import get_db
 from ..models import DurationType, Employee, LeaveRequest, LeaveType, RequestKind, RequestStatus
 from ..schemas import CancelIn, LeaveApply
-from ..services import approvals, balances, notifications, settings_service, workdays
+from ..services import approvals, balances, notifications, workdays
 
 router = APIRouter(prefix="/leaves", tags=["leaves"])
 KIND = RequestKind.LEAVE.value
@@ -47,11 +47,11 @@ def evaluate(db: Session, actor: Employee, emp: Employee, body: LeaveApply, excl
     lt = db.get(LeaveType, body.leave_type_id)
     if lt is None or not lt.is_active:
         raise HTTPException(400, "Invalid leave type")
+    if not balances.applies_to(db, lt, emp):
+        raise HTTPException(400, f"{lt.name} ({lt.code}) is not available for employees in {emp.country_code or 'this location'}")
     dt = body.duration_type.value
     if dt == DurationType.HALF_DAY.value and not lt.allow_half_day:
         raise HTTPException(400, f"{lt.name} cannot be taken as half-day")
-    if dt == DurationType.HOURLY.value and not lt.allow_hourly:
-        raise HTTPException(400, f"{lt.name} cannot be taken hourly")
     if body.start_date.year != body.end_date.year:
         raise HTTPException(400, "A leave cannot span two calendar years — please split it into two requests")
     if body.start_date < emp.joining_date:
@@ -69,17 +69,12 @@ def evaluate(db: Session, actor: Employee, emp: Employee, body: LeaveApply, excl
     if not working:
         raise HTTPException(400, "The selected dates are all weekends or holidays")
 
-    per_day_hours = Decimal(str(settings_service.get(db, "work_hours_per_day")))
     if dt == DurationType.FULL_DAY.value:
         total = Decimal(len(working))
         if lt.max_consecutive_days and total > lt.max_consecutive_days:
             raise HTTPException(400, f"{lt.name} allows at most {lt.max_consecutive_days} consecutive working days")
-    elif dt == DurationType.HALF_DAY.value:
-        total = Decimal("0.5")
     else:
-        if Decimal(body.hours) > per_day_hours:
-            raise HTTPException(400, f"Hourly leave cannot exceed {per_day_hours:g} hours")
-        total = workdays.hours_to_days(db, body.hours)
+        total = Decimal("0.5")
 
     # Overlap check against the employee's other active leave requests.
     clashes = db.scalars(
@@ -176,7 +171,6 @@ def apply_leave(
         end_date=body.end_date,
         duration_type=body.duration_type.value,
         half_day_session=body.half_day_session.value if body.duration_type == DurationType.HALF_DAY else None,
-        hours=body.hours if body.duration_type == DurationType.HOURLY else None,
         total_days=result["total_days"],
         reason=body.reason,
     )
@@ -261,7 +255,6 @@ def modify_leave(
     req.end_date = body.end_date
     req.duration_type = body.duration_type.value
     req.half_day_session = body.half_day_session.value if body.duration_type == DurationType.HALF_DAY else None
-    req.hours = body.hours if body.duration_type == DurationType.HOURLY else None
     req.total_days = result["total_days"]
     req.reason = body.reason
     req.decided_by_id = None

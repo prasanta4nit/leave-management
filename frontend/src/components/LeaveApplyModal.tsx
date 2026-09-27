@@ -36,7 +36,6 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
   const qc = useQueryClient();
   const today = isoDate(new Date());
 
-  const types = useQuery({ queryKey: ['leave-types'], queryFn: () => api.get<LeaveType[]>('/leave-types'), enabled: open });
   const balances = useQuery({ queryKey: ['balances', 'me'], queryFn: () => api.get<Balance[]>('/leaves/my/balances'), enabled: open });
   const employees = useQuery({
     queryKey: ['employees', 'all'],
@@ -45,12 +44,17 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
   });
 
   const [employeeId, setEmployeeId] = useState<number>(me.id);
+  // Only the leave types of the (selected) employee's country
+  const types = useQuery({
+    queryKey: ['leave-types', 'for', employeeId],
+    queryFn: () => api.get<LeaveType[]>(`/leave-types?employee_id=${employeeId}`),
+    enabled: open,
+  });
   const [typeId, setTypeId] = useState<number | ''>('');
   const [duration, setDuration] = useState<DurationType>('FULL_DAY');
   const [start, setStart] = useState(defaultDate ?? today);
   const [end, setEnd] = useState(defaultDate ?? today);
   const [session, setSession] = useState<'FIRST_HALF' | 'SECOND_HALF'>('FIRST_HALF');
-  const [hours, setHours] = useState(2);
   const [reason, setReason] = useState('');
 
   useEffect(() => {
@@ -62,7 +66,6 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
       setStart(existing.start_date);
       setEnd(existing.end_date);
       setSession(existing.half_day_session ?? 'FIRST_HALF');
-      setHours(existing.hours ?? 2);
       setReason(existing.reason ?? '');
     } else {
       setEmployeeId(me.id);
@@ -79,7 +82,6 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
 
   useEffect(() => {
     if (selectedType && duration === 'HALF_DAY' && !selectedType.allow_half_day) setDuration('FULL_DAY');
-    if (selectedType && duration === 'HOURLY' && !selectedType.allow_hourly) setDuration('FULL_DAY');
   }, [selectedType, duration]);
 
   const body = useMemo(
@@ -92,11 +94,10 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
             end_date: duration === 'FULL_DAY' ? end : start,
             duration_type: duration,
             half_day_session: duration === 'HALF_DAY' ? session : null,
-            hours: duration === 'HOURLY' ? hours : null,
             reason: reason || null,
             employee_id: employeeId !== me.id ? employeeId : null,
           },
-    [typeId, start, end, duration, session, hours, reason, employeeId, me.id],
+    [typeId, start, end, duration, session, reason, employeeId, me.id],
   );
   const previewBody = useDebounced(body ? { ...body, reason: null } : null);
   const preview = useQuery({
@@ -119,7 +120,6 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
   const durationOptions: { value: DurationType; label: string; enabled: boolean }[] = [
     { value: 'FULL_DAY', label: 'Full day(s)', enabled: true },
     { value: 'HALF_DAY', label: 'Half day', enabled: !selectedType || selectedType.allow_half_day },
-    { value: 'HOURLY', label: 'Hourly', enabled: !selectedType || selectedType.allow_hourly },
   ];
 
   return (
@@ -139,7 +139,7 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
       <div className="space-y-4">
         {me.is_hr && !existing && (
           <Field label="Employee" hint="HR can apply leave on behalf of an employee.">
-            <select className="input" value={employeeId} onChange={(e) => setEmployeeId(Number(e.target.value))}>
+            <select className="input" value={employeeId} onChange={(e) => { setEmployeeId(Number(e.target.value)); setTypeId(''); }}>
               <option value={me.id}>Myself</option>
               {employees.data?.filter((e) => e.id !== me.id).map((e) => (
                 <option key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</option>
@@ -166,7 +166,7 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
 
         <div>
           <span className="label">Duration</span>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {durationOptions.map((o) => (
               <button
                 key={o.value}
@@ -198,18 +198,12 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
             <Field label="Date">
               <input type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} />
             </Field>
-            {duration === 'HALF_DAY' ? (
-              <Field label="Session">
-                <select className="input" value={session} onChange={(e) => setSession(e.target.value as typeof session)}>
-                  <option value="FIRST_HALF">First half</option>
-                  <option value="SECOND_HALF">Second half</option>
-                </select>
-              </Field>
-            ) : (
-              <Field label="Hours">
-                <input type="number" className="input" min={0.5} step={0.5} max={me.settings.work_hours_per_day} value={hours} onChange={(e) => setHours(Number(e.target.value))} />
-              </Field>
-            )}
+            <Field label="Session">
+              <select className="input" value={session} onChange={(e) => setSession(e.target.value as typeof session)}>
+                <option value="FIRST_HALF">First half</option>
+                <option value="SECOND_HALF">Second half</option>
+              </select>
+            </Field>
           </div>
         )}
 

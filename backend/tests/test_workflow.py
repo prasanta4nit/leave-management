@@ -149,17 +149,16 @@ def test_half_day_sessions_can_share_a_date(client):
     assert r.status_code == 201 and r.json()["total_days"] == 0.5
 
 
-def test_hourly_leave(client):
+def test_hourly_leave_not_supported(client):
     lt = leave_type_id(client, "CASUAL")
     d = future_monday(8).isoformat()
     r = client.post(
         "/api/leaves",
-        json={"leave_type_id": lt, "start_date": d, "end_date": d, "duration_type": "HOURLY", "hours": 2},
+        json={"leave_type_id": lt, "start_date": d, "end_date": d, "duration_type": "HOURLY"},
         headers=EMPLOYEE,
     )
-    assert r.status_code == 201, r.text
-    assert r.json()["total_days"] == 0.25  # 2h of an 8h day
-
+    assert r.status_code == 422  # only FULL_DAY and HALF_DAY exist
+    assert "allow_hourly" not in client.get("/api/leave-types", headers=EMPLOYEE).json()[0]
 
 def test_monthly_accrual_and_proration():
     db = SessionLocal()

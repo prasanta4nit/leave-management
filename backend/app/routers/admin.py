@@ -12,7 +12,7 @@ from ..config import get_settings
 from ..database import get_db
 from ..models import AuditLog, Employee, LeaveType
 from ..schemas import BalanceAdjust, SettingsUpdate
-from ..services import audit, balances, notifications, settings_service
+from ..services import audit, balances, calendars, notifications, settings_service
 
 router = APIRouter(tags=["admin"])
 
@@ -22,15 +22,16 @@ FLOWS = {"MANAGER", "MANAGER_THEN_HR", "HR"}
 @router.get("/auth/me")
 def me(db: Session = Depends(get_db), user: Employee = Depends(get_current_user)):
     s = settings_service.get_all(db)
+    cal = calendars.calendar_for(db, user)
     return {
         **S.employee(user),
         "is_manager": is_manager(db, user),
         "is_hr": user.is_hr,
         "is_admin": user.is_admin,
+        "holiday_calendar": calendars.brief(cal),
         "settings": {
             "company_name": s["company_name"],
-            "work_hours_per_day": s["work_hours_per_day"],
-            "weekend_days": s["weekend_days"],
+            "weekend_days": calendars.weekend_days(db, cal),
             "max_optional_holidays": s["max_optional_holidays"],
         },
     }
@@ -60,8 +61,6 @@ def update_settings(body: SettingsUpdate, db: Session = Depends(get_db), user: E
             raise HTTPException(400, f"{key} must be one of {sorted(FLOWS)}")
     if "weekend_days" in v and (not isinstance(v["weekend_days"], list) or any(d not in range(7) for d in v["weekend_days"])):
         raise HTTPException(400, "weekend_days must be a list of weekday numbers 0-6")
-    if "work_hours_per_day" in v and not (1 <= float(v["work_hours_per_day"]) <= 24):
-        raise HTTPException(400, "work_hours_per_day must be between 1 and 24")
     try:
         before = settings_service.get_all(db)
         result = settings_service.update(db, v)
@@ -104,6 +103,8 @@ def adjust_balance(body: BalanceAdjust, db: Session = Depends(get_db), user: Emp
         raise HTTPException(404, "Employee or leave type not found")
     if lt.is_unlimited:
         raise HTTPException(400, "Unlimited leave types have no balance to adjust")
+    if not balances.applies_to(db, lt, emp):
+        raise HTTPException(400, f"{lt.name} ({lt.code}) doesn't apply to this employee's country")
     bal = balances.ensure_balance(db, emp, lt, body.year)
     bal.adjusted = Decimal(bal.adjusted) + body.delta
     audit.log(

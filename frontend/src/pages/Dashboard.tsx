@@ -6,7 +6,7 @@ import { BarList, ColumnChart } from '../components/BarChart';
 import BalanceCards from '../components/BalanceCards';
 import LeaveApplyModal from '../components/LeaveApplyModal';
 import RequestTable from '../components/RequestTable';
-import { Avatar, Badge, Button, Card, EmptyState, PageHeader, PersonCell, Spinner, StatCard, Tabs } from '../components/ui';
+import { Avatar, Badge, Button, Card, CountryTag, EmptyState, PageHeader, PersonCell, Spinner, StatCard, Tabs } from '../components/ui';
 import { api } from '../lib/api';
 import { useMe } from '../lib/auth';
 import { dateRange, fmtDate, fromNow, titleCase } from '../lib/format';
@@ -104,9 +104,9 @@ function EmployeeDashboard() {
   );
 }
 
-function HolidayList({ holidays }: { holidays: Holiday[] }) {
+function HolidayList({ holidays, showCountry }: { holidays: Holiday[]; showCountry?: boolean }) {
   return (
-    <Card title="Upcoming holidays" action={<Link to="/holidays" className="text-xs font-medium text-brand-600 hover:underline">View all</Link>}>
+    <Card title={showCountry ? 'Upcoming holidays (all countries)' : 'Upcoming holidays'} action={<Link to="/holidays" className="text-xs font-medium text-brand-600 hover:underline">View all</Link>}>
       {holidays.length ? (
         <ul className="space-y-3">
           {holidays.map((h) => (
@@ -116,7 +116,10 @@ function HolidayList({ holidays }: { holidays: Holiday[] }) {
                 <span className="text-base font-bold leading-tight">{fmtDate(h.date, 'd')}</span>
               </div>
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-slate-900">{h.name}</div>
+                <div className="flex items-center gap-1.5 truncate text-sm font-medium text-slate-900">
+                  {showCountry && <CountryTag code={h.country_code} title={h.calendar_name ?? undefined} />}
+                  <span className="truncate">{h.name}</span>
+                </div>
                 <div className="text-xs text-slate-500">{h.weekday}{h.is_optional ? ' · Optional' : ''}</div>
               </div>
             </li>
@@ -239,7 +242,7 @@ function AdminDashboard() {
             <EmptyState title="Everyone is in the office" />
           )}
         </Card>
-        <HolidayList holidays={d.upcoming_holidays} />
+        <HolidayList holidays={d.upcoming_holidays} showCountry />
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Recent joiners">

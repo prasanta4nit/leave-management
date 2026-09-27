@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Search, UserX } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Button, Card, ErrorNote, Field, Modal, PageHeader, PersonCell, Spinner, StatusBadge, Toggle } from '../../components/ui';
+import { Button, Card, CountryTag, ErrorNote, Field, Modal, PageHeader, PersonCell, Spinner, StatusBadge, Toggle } from '../../components/ui';
 import { api, qs } from '../../lib/api';
 import { useMe } from '../../lib/auth';
+import { COUNTRIES, countryName } from '../../lib/countries';
 import { fmtDate, titleCase } from '../../lib/format';
 import { useToast } from '../../lib/toast';
-import type { Department, Designation, Employee } from '../../lib/types';
+import type { Department, Designation, Employee, HolidayCalendar } from '../../lib/types';
 
 export default function AdminEmployees() {
   const [params, setParams] = useSearchParams();
@@ -64,6 +65,7 @@ export default function AdminEmployees() {
                   <th className="table-th">Code</th>
                   <th className="table-th">Department</th>
                   <th className="table-th">Manager</th>
+                  <th className="table-th">Country</th>
                   <th className="table-th">Role</th>
                   <th className="table-th">Joined</th>
                   <th className="table-th">Status</th>
@@ -77,6 +79,7 @@ export default function AdminEmployees() {
                     <td className="table-td">{e.employee_code}</td>
                     <td className="table-td">{e.department ?? '—'}</td>
                     <td className="table-td">{e.manager?.full_name ?? '—'}</td>
+                    <td className="table-td"><CountryTag code={e.country_code} title={countryName(e.country_code)} /></td>
                     <td className="table-td">{titleCase(e.role)}</td>
                     <td className="table-td whitespace-nowrap">{fmtDate(e.joining_date)}</td>
                     <td className="table-td"><StatusBadge status={e.status} /></td>
@@ -104,6 +107,7 @@ const EMPTY = {
   first_name: '', last_name: '', email: '', employee_code: '', phone: '', gender: '', date_of_birth: '',
   designation_id: '', department_id: '', manager_id: '', role: 'EMPLOYEE', employment_type: 'FULL_TIME',
   joining_date: new Date().toISOString().slice(0, 10), exit_date: '', status: 'ACTIVE', location: '', address: '',
+  country_code: 'IN', holiday_calendar_id: '',
   emergency_contact_name: '', emergency_contact_phone: '',
 };
 type Form = typeof EMPTY;
@@ -133,12 +137,15 @@ function EmployeeForm({ employee, onClose }: { employee: Employee | 'new' | null
   const depts = useQuery({ queryKey: ['departments'], queryFn: () => api.get<Department[]>('/departments'), enabled: !!employee });
   const desigs = useQuery({ queryKey: ['designations'], queryFn: () => api.get<Designation[]>('/designations'), enabled: !!employee });
   const people = useQuery({ queryKey: ['employees', 'all'], queryFn: () => api.get<Employee[]>('/employees'), enabled: !!employee });
+  const calendars = useQuery({ queryKey: ['holiday-calendars'], queryFn: () => api.get<HolidayCalendar[]>('/holiday-calendars'), enabled: !!employee });
+  const autoCalendar =
+    calendars.data?.find((c) => c.country_code === form.country_code) ?? calendars.data?.find((c) => c.is_default);
 
   const save = useMutation({
     mutationFn: () => {
       const body: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(form)) {
-        if (['designation_id', 'department_id', 'manager_id'].includes(k)) body[k] = v ? Number(v) : null;
+        if (['designation_id', 'department_id', 'manager_id', 'holiday_calendar_id'].includes(k)) body[k] = v ? Number(v) : null;
         else body[k] = v === '' ? null : v;
       }
       if (!existing) {
@@ -203,7 +210,19 @@ function EmployeeForm({ employee, onClose }: { employee: Employee | 'new' | null
         </Field>
         <Field label="Joining date *"><input type="date" className="input" value={form.joining_date} onChange={set('joining_date')} /></Field>
         <Field label="Phone"><input className="input" value={form.phone} onChange={set('phone')} /></Field>
-        <Field label="Location"><input className="input" value={form.location} onChange={set('location')} /></Field>
+        <Field label="Country">
+          <select className="input" value={form.country_code} onChange={set('country_code')}>
+            <option value="">—</option>
+            {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Holiday calendar" hint="Decides which holidays and weekend apply to this employee's leave.">
+          <select className="input" value={form.holiday_calendar_id} onChange={set('holiday_calendar_id')}>
+            <option value="">Automatic — {autoCalendar ? autoCalendar.name : 'default'} (from country)</option>
+            {calendars.data?.map((c) => <option key={c.id} value={c.id}>{c.name} (override)</option>)}
+          </select>
+        </Field>
+        <Field label="City / location"><input className="input" value={form.location} onChange={set('location')} /></Field>
         <Field label="Gender">
           <select className="input" value={form.gender} onChange={set('gender')}>
             <option value="">—</option><option>Female</option><option>Male</option><option>Non-binary</option><option>Prefer not to say</option>

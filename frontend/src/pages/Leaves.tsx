@@ -6,6 +6,8 @@ import LeaveApplyModal from '../components/LeaveApplyModal';
 import RequestTable from '../components/RequestTable';
 import { Button, Card, PageHeader, Spinner } from '../components/ui';
 import { api, qs } from '../lib/api';
+import { useMe } from '../lib/auth';
+import { countryName } from '../lib/countries';
 import type { Balance, LeaveRequest, LeaveType } from '../lib/types';
 
 export default function Leaves() {
@@ -19,7 +21,8 @@ export default function Leaves() {
     queryKey: ['leaves', 'my', year, status],
     queryFn: () => api.get<LeaveRequest[]>(`/leaves/my${qs({ year, status })}`),
   });
-  const types = useQuery({ queryKey: ['leave-types'], queryFn: () => api.get<LeaveType[]>('/leave-types') });
+  const me = useMe();
+  const types = useQuery({ queryKey: ['leave-types', 'for', me.id], queryFn: () => api.get<LeaveType[]>(`/leave-types?employee_id=${me.id}`) });
 
   return (
     <div className="space-y-6">
@@ -50,7 +53,7 @@ export default function Leaves() {
         {leaves.isLoading ? <Spinner /> : <RequestTable rows={leaves.data ?? []} empty="No leave requests for this period" />}
       </Card>
 
-      <Card title="Leave policies">
+      <Card title={`Leave policies — ${countryName(me.country_code)}`}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {types.data?.map((t) => (
             <div key={t.id} className="rounded-lg border border-slate-200 p-4">
@@ -64,7 +67,7 @@ export default function Leaves() {
                   <li>• {t.annual_quota} days/year, credited {t.accrual_frequency.toLowerCase()}</li>
                 )}
                 {t.carry_forward_enabled && <li>• Carry forward up to {t.max_carry_forward} days</li>}
-                <li>• {[t.allow_half_day && 'Half-day', t.allow_hourly && 'Hourly'].filter(Boolean).join(' & ') || 'Full days only'}</li>
+                <li>• {t.allow_half_day ? 'Full or half days' : 'Full days only'}</li>
                 {t.min_notice_days > 0 && <li>• Apply {t.min_notice_days} day(s) in advance</li>}
                 {t.max_consecutive_days && <li>• Max {t.max_consecutive_days} consecutive days</li>}
                 {t.allow_backdated && <li>• Can be applied after the fact</li>}

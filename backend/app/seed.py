@@ -1,6 +1,6 @@
 """Seed demo data for a ~22 person company. Usage: python -m app.seed [--reset]
 
-Holiday dates are sample data — replace them with your company's official calendar.
+Holiday calendars (India / Israel / Ukraine) come from app/holiday_data.py — verify the dates before real use.
 """
 
 import sys
@@ -15,13 +15,14 @@ from .models import (
     Department,
     Designation,
     Employee,
-    Holiday,
     LeaveRequest,
     LeaveType,
     RequestHistory,
     WfhRequest,
     utcnow,
 )
+from .holiday_data import HOLIDAYS as COUNTRY_HOLIDAYS
+from .holiday_data import install as install_calendars
 from .services import balances, workdays
 
 DEPARTMENTS = [
@@ -62,61 +63,66 @@ EMPLOYEES = [
     ("EMP004", "Rahul", "Verma", "Engineering Manager", "ENG", "EMP001", "EMPLOYEE", "2018-09-10", "FULL_TIME", "Male"),
     ("EMP005", "Vikram", "Singh", "Tech Lead", "ENG", "EMP004", "EMPLOYEE", "2020-02-17", "FULL_TIME", "Male"),
     ("EMP006", "Ananya", "Iyer", "Senior Software Engineer", "ENG", "EMP005", "EMPLOYEE", "2021-05-24", "FULL_TIME", "Female"),
-    ("EMP007", "Karthik", "Reddy", "Senior Software Engineer", "ENG", "EMP005", "EMPLOYEE", "2021-11-08", "FULL_TIME", "Male"),
+    ("EMP007", "Noam", "Levi", "Senior Software Engineer", "ENG", "EMP005", "EMPLOYEE", "2021-11-08", "FULL_TIME", "Male"),
     ("EMP008", "Rohan", "Das", "Software Engineer", "ENG", "EMP005", "EMPLOYEE", "2023-03-06", "FULL_TIME", "Male"),
     ("EMP009", "Sneha", "Patel", "Software Engineer", "ENG", "EMP005", "EMPLOYEE", "2024-01-15", "FULL_TIME", "Female"),
     ("EMP010", "Aditya", "Kumar", "Software Engineer", "ENG", "EMP005", "EMPLOYEE", "2026-03-02", "FULL_TIME", "Male"),
     ("EMP011", "Meera", "Nair", "QA Lead", "QA", "EMP004", "EMPLOYEE", "2020-08-03", "FULL_TIME", "Female"),
-    ("EMP012", "Siddharth", "Jain", "QA Engineer", "QA", "EMP011", "EMPLOYEE", "2022-06-20", "FULL_TIME", "Male"),
+    ("EMP012", "Yael", "Cohen", "QA Engineer", "QA", "EMP011", "EMPLOYEE", "2022-06-20", "FULL_TIME", "Female"),
     ("EMP013", "Kavya", "Menon", "Product Manager", "PROD", "EMP001", "EMPLOYEE", "2019-10-01", "FULL_TIME", "Female"),
-    ("EMP014", "Ishaan", "Malhotra", "UI/UX Designer", "PROD", "EMP013", "EMPLOYEE", "2022-09-12", "FULL_TIME", "Male"),
+    ("EMP014", "Oleksandr", "Kovalenko", "UI/UX Designer", "PROD", "EMP013", "EMPLOYEE", "2022-09-12", "FULL_TIME", "Male"),
     ("EMP015", "Riya", "Bose", "Marketing Specialist", "SALES", "EMP016", "EMPLOYEE", "2023-02-01", "FULL_TIME", "Female"),
     ("EMP016", "Deepak", "Joshi", "Sales Manager", "SALES", "EMP001", "EMPLOYEE", "2019-06-17", "FULL_TIME", "Male"),
     ("EMP017", "Pooja", "Rao", "Sales Executive", "SALES", "EMP016", "EMPLOYEE", "2022-04-11", "FULL_TIME", "Female"),
-    ("EMP018", "Amit", "Chauhan", "Sales Executive", "SALES", "EMP016", "EMPLOYEE", "2024-08-19", "FULL_TIME", "Male"),
+    ("EMP018", "Dmytro", "Bondarenko", "Sales Executive", "SALES", "EMP016", "EMPLOYEE", "2024-08-19", "FULL_TIME", "Male"),
     ("EMP019", "Sanjay", "Kapoor", "Finance Manager", "FIN", "EMP001", "EMPLOYEE", "2018-12-03", "FULL_TIME", "Male"),
     ("EMP020", "Divya", "Pillai", "Accountant", "FIN", "EMP019", "EMPLOYEE", "2021-03-15", "FULL_TIME", "Female"),
     ("EMP021", "Tanvi", "Shah", "Intern", "ENG", "EMP005", "EMPLOYEE", "2026-06-01", "INTERN", "Female"),
-    ("EMP022", "Farhan", "Qureshi", "Software Engineer", "ENG", "EMP005", "EMPLOYEE", "2025-07-07", "CONTRACT", "Male"),
+    ("EMP022", "Iryna", "Shevchenko", "Software Engineer", "ENG", "EMP005", "EMPLOYEE", "2025-07-07", "CONTRACT", "Female"),
 ]
 
+# Country-specific leave policies. Starting points only - confirm quotas with HR / local counsel.
+# country_codes=None means the type applies in every country.
 LEAVE_TYPES = [
+    # ---- India
     dict(code="ANNUAL", name="Annual Leave", color="#6366f1", annual_quota=18, accrual_frequency="MONTHLY",
          carry_forward_enabled=True, max_carry_forward=10, allow_half_day=True, min_notice_days=3, sort_order=1,
-         description="Planned vacation. Accrues 1.5 days per month; up to 10 days carry forward."),
+         country_codes=["IN"], description="Planned vacation. Accrues 1.5 days per month; up to 10 days carry forward."),
     dict(code="CASUAL", name="Casual Leave", color="#f59e0b", annual_quota=8, accrual_frequency="YEARLY",
-         allow_half_day=True, allow_hourly=True, max_consecutive_days=3, sort_order=2,
+         allow_half_day=True, max_consecutive_days=3, sort_order=2, country_codes=["IN"],
          description="Short personal errands. Max 3 consecutive days."),
     dict(code="SICK", name="Sick Leave", color="#ef4444", annual_quota=10, accrual_frequency="YEARLY",
-         allow_half_day=True, allow_hourly=True, allow_backdated=True, sort_order=3,
+         allow_half_day=True, allow_backdated=True, sort_order=3, country_codes=["IN"],
          description="Illness or medical appointments. Can be applied retrospectively."),
+    # ---- Israel
+    dict(code="ANNUAL_IL", name="Annual Leave", color="#6366f1", annual_quota=12, accrual_frequency="MONTHLY",
+         carry_forward_enabled=True, max_carry_forward=12, allow_half_day=True, min_notice_days=3, sort_order=1,
+         country_codes=["IL"], description="Israel: 12 working days/year (grows with seniority), accrues monthly."),
+    dict(code="SICK_IL", name="Sick Leave", color="#ef4444", annual_quota=18, accrual_frequency="MONTHLY",
+         carry_forward_enabled=True, max_carry_forward=90, allow_half_day=True, allow_backdated=True, sort_order=3,
+         country_codes=["IL"], description="Israel: 1.5 days/month, accumulates up to 90 days."),
+    dict(code="RESERVE_IL", name="Reserve Duty (Miluim)", color="#0d9488", annual_quota=0, is_unlimited=True,
+         allow_half_day=False, allow_backdated=True, sort_order=4, country_codes=["IL"],
+         description="IDF reserve service per call-up order (Tzav 8). Does not reduce other balances."),
+    # ---- Ukraine
+    dict(code="ANNUAL_UA", name="Annual Leave", color="#6366f1", annual_quota=20, accrual_frequency="YEARLY",
+         carry_forward_enabled=True, max_carry_forward=20, allow_half_day=True, min_notice_days=3, sort_order=1,
+         country_codes=["UA"], description="Ukraine: 24 calendar days/year statutory (~20 working days)."),
+    dict(code="SICK_UA", name="Sick Leave", color="#ef4444", annual_quota=0, is_unlimited=True,
+         allow_half_day=False, allow_backdated=True, sort_order=3, country_codes=["UA"],
+         description="Ukraine: covered by medical certificate; no fixed annual quota."),
+    # ---- Everyone
     dict(code="UNPAID", name="Unpaid Leave", color="#64748b", annual_quota=0, is_paid=False, is_unlimited=True,
-         allow_half_day=True, sort_order=5, description="Leave without pay once paid balances are exhausted."),
+         allow_half_day=True, sort_order=9, description="Leave without pay once paid balances are exhausted."),
 ]
 
-HOLIDAYS = [
-    ("New Year's Day", "2026-01-01", False),
-    ("Makar Sankranti / Pongal", "2026-01-14", True),
-    ("Republic Day", "2026-01-26", False),
-    ("Holi", "2026-03-04", False),
-    ("Eid al-Fitr", "2026-03-20", True),
-    ("Good Friday", "2026-04-03", False),
-    ("Labour Day", "2026-05-01", False),
-    ("Eid al-Adha", "2026-05-27", True),
-    ("Independence Day", "2026-08-15", False),
-    ("Raksha Bandhan", "2026-08-28", True),
-    ("Gandhi Jayanti", "2026-10-02", False),
-    ("Dussehra", "2026-10-20", False),
-    ("Diwali", "2026-11-09", False),
-    ("Guru Nanak Jayanti", "2026-11-24", True),
-    ("Christmas Day", "2026-12-25", False),
-    ("New Year's Day", "2027-01-01", False),
-    ("Republic Day", "2027-01-26", False),
-]
+# Employees outside India; everyone else is in India.
+COUNTRY = {"EMP007": "IL", "EMP012": "IL", "EMP014": "UA", "EMP018": "UA", "EMP022": "UA"}
+CITY = {"IN": ("Bengaluru", "Pune"), "IL": ("Tel Aviv", "Haifa"), "UA": ("Kyiv", "Lviv")}
 
 
-def _workday(db, d: date, direction: int = 1) -> date:
-    while not workdays.working_dates(db, d, d):
+def _workday(db, d: date, employee_id: int | None = None, direction: int = 1) -> date:
+    while not workdays.working_dates(db, d, d, employee_id):
         d += timedelta(days=direction)
     return d
 
@@ -150,7 +156,8 @@ def seed(reset: bool = False) -> None:
                 employment_type=etype,
                 joining_date=date.fromisoformat(joined),
                 gender=gender,
-                location="Bengaluru" if int(code[3:]) % 3 else "Pune",
+                country_code=COUNTRY.get(code, "IN"),
+                location=CITY[COUNTRY.get(code, "IN")][int(code[3:]) % 2],
             )
             db.add(e)
             emps[code] = e
@@ -165,34 +172,32 @@ def seed(reset: bool = False) -> None:
 
         types = {t["code"]: LeaveType(**t) for t in LEAVE_TYPES}
         db.add_all(types.values())
-        db.add_all([Holiday(name=n, date=date.fromisoformat(d), is_optional=o) for n, d, o in HOLIDAYS])
+        install_calendars(db)
         db.flush()
         db.refresh(emps["EMP001"])
 
         today = date.today()
         for e in emps.values():
-            for lt in types.values():
+            for lt in balances.applicable_types(db, e):
                 balances.ensure_balance(db, e, lt, today.year, today)
 
         def add_leave(code, type_code, start, days=1, status="APPROVED", duration="FULL_DAY", session=None,
-                      hours=None, reason=None, applied_days_before=5):
+                      reason=None, applied_days_before=5):
             emp = emps[code]
-            start = _workday(db, start)
+            start = _workday(db, start, emp.id)
             end = start
             if duration == "FULL_DAY":
                 n = 1
                 while n < days:
-                    end = _workday(db, end + timedelta(days=1))
+                    end = _workday(db, end + timedelta(days=1), emp.id)
                     n += 1
                 total = Decimal(len(workdays.working_dates(db, start, end, emp.id)))
-            elif duration == "HALF_DAY":
-                total = Decimal("0.5")
             else:
-                total = workdays.hours_to_days(db, Decimal(hours))
+                total = Decimal("0.5")
             mgr = db.get(Employee, emp.manager_id) if emp.manager_id else emps["EMP002"]
             applied = utcnow() - timedelta(days=applied_days_before)
             r = LeaveRequest(employee_id=emp.id, leave_type_id=types[type_code].id, start_date=start, end_date=end,
-                             duration_type=duration, half_day_session=session, hours=hours, total_days=total,
+                             duration_type=duration, half_day_session=session, total_days=total,
                              reason=reason, status=status, applied_at=applied)
             if status == "PENDING":
                 r.approval_stage = "MANAGER"
@@ -212,29 +217,30 @@ def seed(reset: bool = False) -> None:
 
         y0 = date(today.year, 1, 1)
         add_leave("EMP006", "ANNUAL", y0 + timedelta(days=40), 3, reason="Family trip to Goa")
-        add_leave("EMP007", "SICK", y0 + timedelta(days=75), 2, reason="Viral fever")
+        add_leave("EMP007", "SICK_IL", y0 + timedelta(days=75), 2, reason="Viral fever")
         add_leave("EMP008", "CASUAL", y0 + timedelta(days=120), 1, reason="Bank work")
         add_leave("EMP009", "ANNUAL", y0 + timedelta(days=150), 5, reason="Sister's wedding")
-        add_leave("EMP012", "SICK", y0 + timedelta(days=160), 1, duration="HALF_DAY", session="FIRST_HALF", reason="Doctor appointment")
+        add_leave("EMP012", "SICK_IL", y0 + timedelta(days=160), 1, duration="HALF_DAY", session="FIRST_HALF", reason="Doctor appointment")
         add_leave("EMP017", "ANNUAL", y0 + timedelta(days=200), 4, reason="Vacation")
-        add_leave("EMP014", "CASUAL", y0 + timedelta(days=210), 1, duration="HOURLY", hours=Decimal(3), reason="Passport verification")
+        add_leave("EMP014", "ANNUAL_UA", y0 + timedelta(days=210), 1, duration="HALF_DAY", session="SECOND_HALF", reason="Passport verification")
         add_leave("EMP020", "ANNUAL", y0 + timedelta(days=220), 2, status="REJECTED", reason="Short break")
         add_leave("EMP005", "ANNUAL", y0 + timedelta(days=230), 3, reason="Trek")
         add_leave("EMP011", "SICK", today - timedelta(days=12), 1, reason="Migraine")
         add_leave("EMP015", "ANNUAL", today, 1, reason="Personal")
         add_leave("EMP008", "ANNUAL", today + timedelta(days=10), 3, status="PENDING", reason="Hometown visit", applied_days_before=2)
         add_leave("EMP009", "CASUAL", today + timedelta(days=4), 1, status="PENDING", reason="House shifting", applied_days_before=1)
-        add_leave("EMP012", "ANNUAL", today + timedelta(days=20), 5, status="PENDING", reason="Diwali with family")
-        add_leave("EMP018", "CASUAL", today + timedelta(days=3), 1, duration="HALF_DAY", session="SECOND_HALF", status="PENDING", reason="Parent-teacher meeting", applied_days_before=0)
+        add_leave("EMP012", "ANNUAL_IL", today + timedelta(days=20), 5, status="PENDING", reason="Family trip to Eilat")
+        add_leave("EMP018", "ANNUAL_UA", today + timedelta(days=3), 1, duration="HALF_DAY", session="SECOND_HALF", status="PENDING", reason="Parent-teacher meeting", applied_days_before=0)
         add_leave("EMP006", "ANNUAL", today + timedelta(days=30), 2, reason="Long weekend")
+        add_leave("EMP007", "RESERVE_IL", today + timedelta(days=15), 5, reason="Reserve duty call-up (Tzav 8)")
         add_leave("EMP020", "SICK", today + timedelta(days=1), 1, status="PENDING", reason="Dental procedure", applied_days_before=1)
 
         def wfh(code, start, days, status):
             emp = emps[code]
-            start = _workday(db, start)
+            start = _workday(db, start, emp.id)
             end = start
             for _ in range(days - 1):
-                end = _workday(db, end + timedelta(days=1))
+                end = _workday(db, end + timedelta(days=1), emp.id)
             w = WfhRequest(employee_id=emp.id, start_date=start, end_date=end, reason="Internet installation at new flat" if status == "PENDING" else "Plumbing work at home",
                            total_days=len(workdays.working_dates(db, start, end, emp.id)), status=status)
             if status == "PENDING":
@@ -252,7 +258,8 @@ def seed(reset: bool = False) -> None:
         wfh("EMP010", today + timedelta(days=6), 1, "PENDING")
 
         db.commit()
-        print(f"Seeded {len(emps)} employees, {len(types)} leave types, {len(HOLIDAYS)} holidays.")
+        n_holidays = sum(len(v) for v in COUNTRY_HOLIDAYS.values())
+        print(f"Seeded {len(emps)} employees, {len(types)} leave types, 3 holiday calendars ({n_holidays} holidays).")
         print("Admin: arjun.mehta@acme.example | HR: priya.sharma@acme.example | Manager: vikram.singh@acme.example")
     finally:
         db.close()

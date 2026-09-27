@@ -57,11 +57,9 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <Field label="Company name"><input className="input" value={s.company_name} onChange={(e) => set('company_name', e.target.value)} /></Field>
             <Field label="Timezone"><input className="input" value={s.timezone} onChange={(e) => set('timezone', e.target.value)} /></Field>
-            <Field label="Working hours per day" hint="Used to convert hourly leave into days.">
-              <input type="number" min={1} max={24} step={0.5} className="input" value={s.work_hours_per_day} onChange={(e) => set('work_hours_per_day', Number(e.target.value))} />
-            </Field>
             <div>
-              <span className="label">Weekend days</span>
+              <span className="label">Default weekend days</span>
+              <p className="mb-2 text-xs text-slate-500">Used by holiday calendars that don't set their own weekend (Holidays → Calendars).</p>
               <div className="flex flex-wrap gap-2">
                 {WEEKDAYS.map((d, i) => {
                   const on = s.weekend_days.includes(i);

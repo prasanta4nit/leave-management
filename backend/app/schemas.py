@@ -4,9 +4,22 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, field_validator, model_validator
+from typing_extensions import Annotated
 
 from .models import AccrualFrequency, DurationType, EmploymentType, HalfDaySession, Role
+
+
+def _country(v: str | None) -> str | None:
+    if v is None or v == "":
+        return None
+    v = v.strip().upper()
+    if len(v) != 2 or not v.isalpha():
+        raise ValueError("Country must be a 2-letter ISO code, e.g. IN, IL, UA")
+    return v
+
+
+CountryCode = Annotated[str | None, AfterValidator(_country)]
 
 
 class EmployeeBase(BaseModel):
@@ -23,6 +36,8 @@ class EmployeeBase(BaseModel):
     employment_type: EmploymentType = EmploymentType.FULL_TIME
     joining_date: date
     location: str | None = None
+    country_code: CountryCode = None
+    holiday_calendar_id: int | None = None  # override; normally derived from country
     address: str | None = None
     emergency_contact_name: str | None = None
     emergency_contact_phone: str | None = None
@@ -52,6 +67,8 @@ class EmployeeUpdate(BaseModel):
     exit_date: date | None = None
     status: Literal["ACTIVE", "INACTIVE"] | None = None
     location: str | None = None
+    country_code: CountryCode = None
+    holiday_calendar_id: int | None = None
     address: str | None = None
     emergency_contact_name: str | None = None
     emergency_contact_phone: str | None = None
@@ -97,13 +114,20 @@ class LeaveTypeIn(BaseModel):
     carry_forward_enabled: bool = False
     max_carry_forward: Decimal = Field(default=Decimal(0), ge=0, le=365)
     allow_half_day: bool = True
-    allow_hourly: bool = False
     allow_negative_balance: bool = False
     allow_backdated: bool = False
     min_notice_days: int = Field(default=0, ge=0, le=365)
     max_consecutive_days: int | None = Field(default=None, ge=1, le=365)
+    country_codes: list[str] | None = None  # None / [] = all countries
     is_active: bool = True
     sort_order: int = 0
+
+    @field_validator("country_codes")
+    @classmethod
+    def _countries(cls, v: list[str] | None) -> list[str] | None:
+        if not v:
+            return None
+        return sorted({_country(c) for c in v})
 
 
 class LeaveApply(BaseModel):
@@ -112,7 +136,6 @@ class LeaveApply(BaseModel):
     end_date: date
     duration_type: DurationType = DurationType.FULL_DAY
     half_day_session: HalfDaySession | None = None
-    hours: Decimal | None = Field(default=None, gt=0, le=24)
     reason: str | None = Field(default=None, max_length=1000)
     employee_id: int | None = None  # HR applying on behalf of someone
 
@@ -121,11 +144,9 @@ class LeaveApply(BaseModel):
         if self.end_date < self.start_date:
             raise ValueError("End date cannot be before start date")
         if self.duration_type != DurationType.FULL_DAY and self.start_date != self.end_date:
-            raise ValueError("Half-day and hourly leave must be for a single date")
+            raise ValueError("Half-day leave must be for a single date")
         if self.duration_type == DurationType.HALF_DAY and self.half_day_session is None:
             raise ValueError("Select first half or second half")
-        if self.duration_type == DurationType.HOURLY and not self.hours:
-            raise ValueError("Enter the number of hours")
         return self
 
 
@@ -149,7 +170,25 @@ class WfhApply(BaseModel):
         return self
 
 
+class HolidayCalendarIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    country_code: CountryCode = None
+    description: str | None = Field(default=None, max_length=255)
+    weekend_days: list[int] | None = None  # None = company default
+    is_default: bool = False
+
+    @field_validator("weekend_days")
+    @classmethod
+    def _weekend(cls, v: list[int] | None) -> list[int] | None:
+        if v is None:
+            return None
+        if any(d not in range(7) for d in v) or len(set(v)) != len(v) or len(v) > 3:
+            raise ValueError("weekend_days must be up to 3 distinct weekday numbers 0-6 (Mon=0)")
+        return sorted(v)
+
+
 class HolidayIn(BaseModel):
+    calendar_id: int | None = None  # defaults to the company's default calendar
     name: str = Field(min_length=1, max_length=100)
     date: date
     is_optional: bool = False

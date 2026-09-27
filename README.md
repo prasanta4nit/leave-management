@@ -17,9 +17,9 @@ CloudFront serves the SPA and also forwards `/api/*` to API Gateway, so the brow
 | Module | What's included |
 |---|---|
 | **Directory / Org chart** | Profiles (designation, department, manager, joining date, contact), grid/list/team views, search and filters, org chart you can collapse and zoom plus an outline view, and a profile page showing leave balance, history and team (manager, peers, reports) |
-| **Leave management** | Configurable leave types (Annual, Casual, Sick and Unpaid seeded). Full-day, half-day (1st/2nd half) and hourly leave. Balances show credited, used, pending and available days. Yearly, quarterly or monthly accrual, pro-rated for new joiners, with carry-forward caps. Per-type rules: notice period, maximum consecutive days, backdating and negative balance. Modify or cancel requests |
+| **Leave management** | **Country-specific leave types and policies**: each type applies to chosen countries (or all), so employees only see and accrue their own country's leave. Seeded: India (Annual 18, Casual 8, Sick 10), Israel (Annual 12, Sick 18 accumulating to 90, Reserve Duty), Ukraine (Annual 20, Sick by certificate), and Unpaid for everyone. Full-day and half-day (1st/2nd half) leave. Balances show credited, used, pending and available days. Yearly, quarterly or monthly accrual, pro-rated for new joiners, with carry-forward caps. Per-type rules: notice period, maximum consecutive days, backdating and negative balance. Modify or cancel requests |
 | **Approval workflow** | Manager approval, manager then HR (two levels), or HR only, configurable separately for leave and WFH. HR/Admin can override any decision and each override is flagged. Pending-approval dashboard. Full history for every request |
-| **Holidays & calendar** | Company and optional holidays (employees opt in, up to a set number per year). Weekends are configurable. Weekends, holidays and chosen optional holidays are left out of day counts. Team, department and company calendar views |
+| **Holidays & calendar** | **Country-specific holiday calendars** (India, Israel and Ukraine seeded), each with its own holidays and weekend (Israel: Fri–Sat). Employees get a calendar from their country, and HR can override it per person. Optional holidays (employees opt in, up to a set number per year). Weekends, holidays and chosen optional holidays are left out of day counts using each employee's own calendar. The team calendar shows every country's holidays, tagged by country |
 | **Employee services** | Work-from-home requests (with a monthly limit). Employees can edit their own profile details |
 | **Dashboards** | Employee, Manager (team availability today, pending approvals, next 2 weeks of team leave) and Admin/HR (headcount, who's out, pending requests, leave by month and type, recent activity) |
 | **Reports** | Utilization, employee history, department-wise, monthly/yearly. Every report exports to CSV and Excel. Managers only see their own reporting tree |
@@ -72,11 +72,13 @@ In dev auth mode the login screen lists every employee, so you can sign in as an
 - **Arjun Mehta**: CEO / Admin
 - **Priya Sharma**: HR
 - **Vikram Singh**: Tech Lead, manages 7 people
-- **Rohan Das**: Software Engineer
+- **Rohan Das**: Software Engineer (India)
+- **Noam Levi**: Senior Software Engineer (Israel, Fri–Sat weekend)
+- **Oleksandr Kovalenko**: UI/UX Designer (Ukraine)
 
 Dev mode trusts an `X-Dev-User` header. **Never** deploy with `AUTH_MODE=dev`.
 
-**Tests:** `cd backend && pytest`. There are 17 end-to-end tests covering the workflow, balances, accrual, carry-forward, overlaps, half-day and hourly leave, permissions, reports/exports and jobs.
+**Tests:** `cd backend && pytest`. There are 31 end-to-end tests covering country leave policies, country calendars (per-country weekends and holidays, assignment and overrides), the workflow, balances, accrual, carry-forward, overlaps, half-day leave, permissions, reports/exports and jobs.
 
 ## Deploy to AWS
 
@@ -89,7 +91,8 @@ Prerequisites: AWS CLI, SAM CLI, Node 20+, Python 3.12, and a VPC with **two pri
 # 2. Frontend (reads Cognito IDs and the bucket from stack outputs)
 ./scripts/deploy-frontend.sh leavedesk
 
-# 3. One-time: create tables, default leave policies and the first Admin (they get an email invite)
+# 3. One-time: create tables, default leave policies, India/Israel/Ukraine holiday calendars
+#    and the first Admin (they get an email invite)
 ./scripts/bootstrap.sh you@company.com "First" "Last" "Your Company" leavedesk
 ```
 
@@ -112,7 +115,9 @@ Admins can also run these from **Admin → Settings**.
 ## Design notes
 
 - **Balances can't drift.** A balance row stores only credits: allocated, accrued, carried forward and adjustments. Used and pending days are always summed from leave requests, so approving, cancelling, modifying or overriding a request never needs balance bookkeeping.
-- **Day counting** (`services/workdays.py`) skips configured weekend days, mandatory holidays and the employee's chosen optional holidays. Hourly leave counts as hours ÷ `work_hours_per_day`. Two half-day requests for different halves of the same day are allowed.
+- **Leave policies per country:** `leave_types.country_codes` lists the countries a type applies to (empty means all). An employee's policy country is their `country_code`, or their holiday calendar's country if that's empty. Accrual, balances, applications, adjustments and reports only use the types that apply. If someone moves country, types they already used that year stay visible as "previous policy" but stop accruing.
+- **Holiday calendars** (`services/calendars.py`): an employee's calendar is their HR-assigned calendar if set, otherwise the calendar for their `country_code`, otherwise the default calendar. Each calendar can set its own weekend days (falling back to the company setting). Starter holiday data is in `app/holiday_data.py`. **Verify those dates**: Hebrew-calendar, Orthodox and lunar holidays move every year. Under martial law, Ukraine's public holidays are not statutory days off, so keep only the ones your company grants.
+- **Day counting** (`services/workdays.py`) uses the employee's calendar: it skips that calendar's weekend days, its mandatory holidays and the employee's chosen optional holidays from that calendar. Two half-day requests for different halves of the same day are allowed.
 - **Approval routing** (`services/approvals.py`) is shared by leave and WFH requests. Employees without an active manager go to HR. Nobody can approve their own request, except an Admin (usually the CEO), and you can turn on auto-approval for that case.
 - **Audit:** every approval action is written to `request_history` (visible in Approvals → History and on each request). Admin changes go to `audit_logs` with before/after values.
 - **Schema:** `Base.metadata.create_all` runs from `bootstrap` and `seed`. If the schema starts to change often, add Alembic.

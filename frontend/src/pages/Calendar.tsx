@@ -63,7 +63,7 @@ export default function CalendarPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-4 border-t border-slate-100 px-4 py-3 text-xs text-slate-600">
-          {types.data?.map((t) => (
+          {types.data?.filter((t, i, all) => all.findIndex((x) => x.name === t.name && x.color === t.color) === i).map((t) => (
             <span key={t.id} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: t.color }} />{t.name}</span>
           ))}
           <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-sky-500" />WFH</span>

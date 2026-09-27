@@ -32,28 +32,30 @@ CREATE TABLE leave_types (
 	carry_forward_enabled BOOL NOT NULL, 
 	max_carry_forward NUMERIC(6, 2) NOT NULL, 
 	allow_half_day BOOL NOT NULL, 
-	allow_hourly BOOL NOT NULL, 
 	allow_negative_balance BOOL NOT NULL, 
 	allow_backdated BOOL NOT NULL, 
 	min_notice_days INTEGER NOT NULL, 
 	max_consecutive_days INTEGER, 
+	country_codes JSON, 
 	is_active BOOL NOT NULL, 
 	sort_order INTEGER NOT NULL, 
 	PRIMARY KEY (id), 
 	UNIQUE (code)
 );
 
-CREATE TABLE holidays (
+CREATE TABLE holiday_calendars (
 	id INTEGER NOT NULL AUTO_INCREMENT, 
 	name VARCHAR(100) NOT NULL, 
-	date DATE NOT NULL, 
-	is_optional BOOL NOT NULL, 
+	country_code VARCHAR(2), 
 	description VARCHAR(255), 
+	weekend_days JSON, 
+	is_default BOOL NOT NULL, 
+	created_at DATETIME NOT NULL, 
 	PRIMARY KEY (id), 
-	CONSTRAINT uq_holiday UNIQUE (date, name)
+	UNIQUE (name)
 );
 
-CREATE INDEX ix_holidays_date ON holidays (date);
+CREATE INDEX ix_holiday_calendars_country_code ON holiday_calendars (country_code);
 
 CREATE TABLE system_settings (
 	`key` VARCHAR(60) NOT NULL, 
@@ -80,6 +82,8 @@ CREATE TABLE employees (
 	joining_date DATE NOT NULL, 
 	exit_date DATE, 
 	location VARCHAR(100), 
+	country_code VARCHAR(2), 
+	holiday_calendar_id INTEGER, 
 	address VARCHAR(255), 
 	emergency_contact_name VARCHAR(100), 
 	emergency_contact_phone VARCHAR(30), 
@@ -93,10 +97,29 @@ CREATE TABLE employees (
 	UNIQUE (email), 
 	FOREIGN KEY(designation_id) REFERENCES designations (id) ON DELETE SET NULL, 
 	FOREIGN KEY(department_id) REFERENCES departments (id) ON DELETE SET NULL, 
-	FOREIGN KEY(manager_id) REFERENCES employees (id) ON DELETE SET NULL
+	FOREIGN KEY(manager_id) REFERENCES employees (id) ON DELETE SET NULL, 
+	FOREIGN KEY(holiday_calendar_id) REFERENCES holiday_calendars (id) ON DELETE SET NULL
 );
 
 CREATE INDEX ix_employees_status ON employees (status);
+
+CREATE INDEX ix_employees_country_code ON employees (country_code);
+
+CREATE TABLE holidays (
+	id INTEGER NOT NULL AUTO_INCREMENT, 
+	calendar_id INTEGER NOT NULL, 
+	name VARCHAR(100) NOT NULL, 
+	date DATE NOT NULL, 
+	is_optional BOOL NOT NULL, 
+	description VARCHAR(255), 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_holiday UNIQUE (calendar_id, date, name), 
+	FOREIGN KEY(calendar_id) REFERENCES holiday_calendars (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_holidays_calendar_id ON holidays (calendar_id);
+
+CREATE INDEX ix_holidays_date ON holidays (date);
 
 CREATE TABLE leave_balances (
 	id INTEGER NOT NULL AUTO_INCREMENT, 
@@ -123,7 +146,6 @@ CREATE TABLE leave_requests (
 	end_date DATE NOT NULL, 
 	duration_type VARCHAR(20) NOT NULL, 
 	half_day_session VARCHAR(20), 
-	hours NUMERIC(4, 2), 
 	total_days NUMERIC(6, 2) NOT NULL, 
 	reason VARCHAR(1000), 
 	status VARCHAR(20) NOT NULL, 
