@@ -18,7 +18,7 @@ from ..models import (
     RequestStatus,
     WfhRequest,
 )
-from ..services import balances, calendars
+from ..services import balances, calendars, settings_service, workdays
 from .approvals import pending_for
 from .calendar import team_ids
 from .leaves import calendar_entries
@@ -53,6 +53,74 @@ def _todays_status(db: Session, ids: set[int], day: date) -> dict[int, dict]:
     ):
         status.setdefault(w.employee_id, {"presence": "WFH", "label": "Working from home", "color": "#0ea5e9"})
     return status
+
+
+def _next_occurrence(d: date, today: date) -> date:
+    for year in (today.year, today.year + 1):
+        try:
+            candidate = d.replace(year=year)
+        except ValueError:  # 29 Feb in a non-leap year
+            candidate = date(year, 3, 1)
+        if candidate >= today:
+            return candidate
+    return d
+
+
+def celebrations(db: Session, today: date, days: int = 30) -> list[dict]:
+    """Upcoming birthdays (day/month only - never the year) and work anniversaries."""
+    horizon = today + timedelta(days=days)
+    items = []
+    employees = db.scalars(
+        select(Employee)
+        .options(selectinload(Employee.designation), selectinload(Employee.department))
+        .where(Employee.status == "ACTIVE")
+    )
+    for e in employees:
+        if e.date_of_birth:
+            when = _next_occurrence(e.date_of_birth, today)
+            if when <= horizon:
+                items.append({"kind": "BIRTHDAY", "date": when, "employee": S.employee_brief(e)})
+        if e.joining_date and e.joining_date < today:
+            when = _next_occurrence(e.joining_date, today)
+            years = when.year - e.joining_date.year
+            if years >= 1 and when <= horizon:
+                items.append({"kind": "ANNIVERSARY", "date": when, "years": years, "employee": S.employee_brief(e)})
+    items.sort(key=lambda x: (x["date"], x["employee"]["full_name"]))
+    return items
+
+
+def my_status(db: Session, user: Employee, today: date) -> dict:
+    mine = _todays_status(db, {user.id}, today).get(user.id)
+    if mine:
+        return {"kind": mine["presence"], "label": mine["label"]}
+    off = workdays.non_working_dates(db, today, today, user.id).get(today)
+    if off == "Weekend":
+        return {"kind": "WEEKEND", "label": "Weekend"}
+    if off:
+        return {"kind": "HOLIDAY", "label": off}
+    return {"kind": "WORKING", "label": "Working day"}
+
+
+@router.get("/notifications")
+def notifications(db: Session = Depends(get_db), user: Employee = Depends(get_current_user)):
+    """Bell menu: requests awaiting my decision + recent decisions on my own requests."""
+    awaiting = [p for p in pending_for(db, user) if p.get("awaiting_me")]
+    since = date.today() - timedelta(days=14)
+    updates: list[dict] = []
+    for model, ser in ((LeaveRequest, S.leave_request), (WfhRequest, S.wfh_request)):
+        opts = [selectinload(model.employee), selectinload(model.decided_by), selectinload(model.current_approver)]
+        if model is LeaveRequest:
+            opts.append(selectinload(LeaveRequest.leave_type))
+        for r in db.scalars(
+            select(model).options(*opts).where(model.employee_id == user.id, model.decided_at.is_not(None), model.decided_at >= since)
+        ):
+            updates.append(ser(r))
+    updates.sort(key=lambda x: x["decided_at"], reverse=True)
+    return {
+        "awaiting_count": len(awaiting),
+        "awaiting": awaiting[:5],
+        "updates": updates[:5],
+    }
 
 
 @router.get("/employee")
@@ -94,7 +162,11 @@ def employee_dashboard(db: Session = Depends(get_db), user: Employee = Depends(g
     out_today = _todays_status(db, team, today)
     people = {e.id: e for e in db.scalars(select(Employee).where(Employee.id.in_(set(out_today) or {0})))}
 
+    show_celebrations = bool(settings_service.get(db, "show_celebrations"))
     return {
+        "today": my_status(db, user, today),
+        "holiday_calendar": calendars.brief(cal),
+        "celebrations": celebrations(db, today) if show_celebrations else [],
         "balances": bal,
         "upcoming_leaves": [S.leave_request(r) for r in upcoming],
         "upcoming_holidays": [S.holiday(h) for h in holidays],
@@ -161,14 +233,14 @@ def admin_dashboard(db: Session = Depends(get_db), user: Employee = Depends(requ
 
     # Leave days taken this year by type and by month.
     types = {t.id: t for t in db.scalars(select(LeaveType))}
-    by_leave_type: dict[str, float] = defaultdict(float)
+    by_leave_type: dict[int, float] = defaultdict(float)
     monthly: dict[int, float] = defaultdict(float)
     for r in db.scalars(
         select(LeaveRequest).where(
             LeaveRequest.status == RequestStatus.APPROVED.value, extract("year", LeaveRequest.start_date) == today.year
         )
     ):
-        by_leave_type[types[r.leave_type_id].name] += float(r.total_days)
+        by_leave_type[r.leave_type_id] += float(r.total_days)
         monthly[r.start_date.month] += float(r.total_days)
 
     # Upcoming holidays across every country calendar, tagged with the calendar.
@@ -191,8 +263,15 @@ def admin_dashboard(db: Session = Depends(get_db), user: Employee = Depends(requ
         "pending": pending_counts,
         "pending_total": sum(pending_counts.values()),
         "leave_by_type": [
-            {"name": t.name, "color": t.color, "days": round(by_leave_type.get(t.name, 0), 2)}
-            for t in types.values()
+            {
+                "id": t.id,
+                "code": t.code,
+                "name": t.name,
+                "color": t.color,
+                "country_codes": t.country_codes or [],
+                "days": round(by_leave_type.get(t.id, 0), 2),
+            }
+            for t in sorted(types.values(), key=lambda t: (-by_leave_type.get(t.id, 0), t.sort_order, t.name))
             if t.is_active
         ],
         "leave_by_month": [{"month": m, "days": round(monthly.get(m, 0), 2)} for m in range(1, 13)],

@@ -20,6 +20,8 @@ DEFAULTS: dict[str, Any] = {
     "max_optional_holidays": 2,
     "max_wfh_days_per_month": 8,
     "notify_hr_on_leave": False,
+    # Show upcoming birthdays (day/month only) and work anniversaries on the home dashboard.
+    "show_celebrations": True,
 }
 
 

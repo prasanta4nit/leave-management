@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, CheckCheck, ShieldAlert, X } from 'lucide-react';
+import { Check, CheckCheck, CheckSquare, ShieldAlert, X } from 'lucide-react';
 import { useState } from 'react';
 import RequestDetailModal from '../components/RequestDetailModal';
 import { Badge, Button, Card, EmptyState, PageHeader, PersonCell, Spinner, StatusBadge, Tabs } from '../components/ui';
@@ -31,7 +31,7 @@ export default function Approvals() {
 
   return (
     <div>
-      <PageHeader title="Approvals" subtitle="Review leave and work-from-home requests" />
+      <PageHeader icon={<CheckSquare className="h-5 w-5" />} title="Approvals" subtitle="Review leave and work-from-home requests" />
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
       {tab !== 'history' ? (
         <>

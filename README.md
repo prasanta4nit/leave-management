@@ -21,7 +21,8 @@ CloudFront serves the SPA and also forwards `/api/*` to API Gateway, so the brow
 | **Approval workflow** | Manager approval, manager then HR (two levels), or HR only, configurable separately for leave and WFH. HR/Admin can override any decision and each override is flagged. Pending-approval dashboard. Full history for every request |
 | **Holidays & calendar** | **Country-specific holiday calendars** (India, Israel and Ukraine seeded), each with its own holidays and weekend (Israel: Fri–Sat). Employees get a calendar from their country, and HR can override it per person. Optional holidays (employees opt in, up to a set number per year). Weekends, holidays and chosen optional holidays are left out of day counts using each employee's own calendar. The team calendar shows every country's holidays, tagged by country |
 | **Employee services** | Work-from-home requests (with a monthly limit). Employees can edit their own profile details |
-| **Dashboards** | Employee, Manager (team availability today, pending approvals, next 2 weeks of team leave) and Admin/HR (headcount, who's out, pending requests, leave by month and type, recent activity) |
+| **Dashboards** | **My desk** is everyone's home page: today's status, quick actions, balance rings, the next holiday, a 7-day view of who on your team is off or working from home, and birthdays and work anniversaries (day/month only; can be turned off in Settings). Managers also get **My team** (availability, pending approvals, the next 2 weeks of leave), and HR/Admin get **Organization** (headcount, who's out, pending requests, leave by month and by country-specific type, recent activity) |
+| **App shell** | A top bar with people/page search (Ctrl+K), **Apply leave** from any page, a notifications bell (requests awaiting you and decisions on your own requests) and an account menu. The sidebar can collapse to icons. Works at phone width |
 | **Reports** | Utilization, employee history, department-wise, monthly/yearly. Every report exports to CSV and Excel. Managers only see their own reporting tree |
 | **Notifications (SES)** | Emails for applications, decisions, manager→HR escalation, cancellations and WFH, plus scheduled reminders for requests pending too long |
 | **Admin** | Employees (creating one also creates their Cognito login), departments, designations, reporting lines (circular reporting is blocked), leave policies, holidays, approval settings, system settings, balance adjustments, audit log |
@@ -56,7 +57,7 @@ python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\
 pip install -r requirements-dev.txt
 cp .env.example .env              # AUTH_MODE=dev; choose MySQL (docker compose up -d) or SQLite
 python -m app.seed --reset        # tables + demo data
-uvicorn app.main:app --reload --port 8001   # http://localhost:8001/api/docs
+uvicorn app.main:app --reload --port 8000   # http://localhost:8000/api/docs
 ```
 
 **Frontend** (Node 20+):
@@ -65,7 +66,7 @@ uvicorn app.main:app --reload --port 8001   # http://localhost:8001/api/docs
 cd frontend
 npm install
 cp .env.example .env.local        # VITE_AUTH_MODE=dev
-npm run dev                       # http://localhost:5173 (proxies /api to :8001)
+npm run dev                       # http://localhost:5173 (proxies /api to :8000)
 ```
 
 In dev auth mode the login screen lists every employee, so you can sign in as anyone. Good accounts to try:
@@ -78,7 +79,7 @@ In dev auth mode the login screen lists every employee, so you can sign in as an
 
 Dev mode trusts an `X-Dev-User` header. **Never** deploy with `AUTH_MODE=dev`.
 
-**Tests:** `cd backend && pytest`. There are 31 end-to-end tests covering country leave policies, country calendars (per-country weekends and holidays, assignment and overrides), the workflow, balances, accrual, carry-forward, overlaps, half-day leave, permissions, reports/exports and jobs.
+**Tests:** `cd backend && pytest`. There are 36 end-to-end tests covering the dashboards and notifications, country leave policies, country calendars (per-country weekends and holidays, assignment and overrides), the workflow, balances, accrual, carry-forward, overlaps, half-day leave, permissions, reports/exports and jobs.
 
 ## Deploy to AWS
 

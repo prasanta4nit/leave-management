@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 import BalanceCards from '../components/BalanceCards';
 import LeaveApplyModal from '../components/LeaveApplyModal';
 import RequestTable from '../components/RequestTable';
-import { Button, Card, PageHeader, Spinner } from '../components/ui';
+import { Card, EmptyState, PageHeader, Spinner } from '../components/ui';
 import { api, qs } from '../lib/api';
 import { useMe } from '../lib/auth';
 import { countryName } from '../lib/countries';
@@ -27,21 +27,20 @@ export default function Leaves() {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={<ClipboardList className="h-5 w-5" />}
         title="My leave"
         subtitle="Balances, requests and policies"
         actions={
-          <>
-            <select className="input w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {[thisYear + 1, thisYear, thisYear - 1, thisYear - 2].map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <Button onClick={() => setApplying(true)}><Plus className="h-4 w-4" /> Apply leave</Button>
-          </>
+          <select className="input w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))} aria-label="Year">
+            {[thisYear + 1, thisYear, thisYear - 1, thisYear - 2].map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
         }
       />
       {balances.data ? <BalanceCards balances={balances.data} /> : <Spinner />}
 
       <Card
         title="Leave requests"
+        subtitle={`${year}`}
         bodyClass="p-0"
         action={
           <select className="input w-auto py-1 text-xs" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -50,16 +49,26 @@ export default function Leaves() {
           </select>
         }
       >
-        {leaves.isLoading ? <Spinner /> : <RequestTable rows={leaves.data ?? []} empty="No leave requests for this period" />}
+        {leaves.isLoading ? (
+          <Spinner />
+        ) : leaves.data?.length ? (
+          <RequestTable rows={leaves.data} />
+        ) : (
+          <EmptyState compact icon={<ClipboardList className="h-6 w-6" />} title="No leave requests for this period">
+            <button className="link" onClick={() => setApplying(true)}>Apply for leave</button>
+          </EmptyState>
+        )}
       </Card>
 
-      <Card title={`Leave policies — ${countryName(me.country_code)}`}>
+      <Card title="Your leave policies" subtitle={`Rules for ${countryName(me.country_code)}`}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {types.data?.map((t) => (
-            <div key={t.id} className="rounded-lg border border-slate-200 p-4">
-              <div className="mb-1 flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: t.color }} />
-                <span className="font-medium text-slate-900">{t.name}</span>
+            <div key={t.id} className="rounded-2xl border border-slate-200/70 bg-slate-50/40 p-4">
+              <div className="mb-1.5 flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${t.color}18` }}>
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: t.color }} />
+                </span>
+                <span className="font-semibold text-slate-900">{t.name}</span>
               </div>
               {t.description && <p className="mb-2 text-sm text-slate-500">{t.description}</p>}
               <ul className="space-y-0.5 text-xs text-slate-600">

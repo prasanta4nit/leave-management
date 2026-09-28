@@ -9,8 +9,8 @@ export default defineConfig(({ mode }) => {
     define: { global: 'globalThis' },
     server: {
       port: 5173,
-      // Local FastAPI backend (uvicorn app.main:app --port 8001)
-      proxy: { '/api': env.VITE_API_PROXY_TARGET || 'http://localhost:8001' },
+      // Local FastAPI backend (uvicorn app.main:app --port 8000)
+      proxy: { '/api': env.VITE_API_PROXY_TARGET || 'http://localhost:8000' },
     },
   };
 });

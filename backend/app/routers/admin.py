@@ -45,7 +45,17 @@ def dev_users(db: Session = Depends(get_db)):
     rows = db.scalars(
         select(Employee).options(selectinload(Employee.designation)).where(Employee.status == "ACTIVE").order_by(Employee.role, Employee.first_name)
     )
-    return [{"email": e.email, "full_name": e.full_name, "role": e.role, "designation": e.designation.name if e.designation else None} for e in rows]
+    return [
+        {
+            "id": e.id,
+            "email": e.email,
+            "full_name": e.full_name,
+            "role": e.role,
+            "designation": e.designation.name if e.designation else None,
+            "country_code": e.country_code,
+        }
+        for e in rows
+    ]
 
 
 @router.get("/admin/settings")

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Laptop, Plus } from 'lucide-react';
 import { useState } from 'react';
 import RequestTable from '../components/RequestTable';
 import { Button, Card, ErrorNote, Field, Modal, PageHeader, Spinner } from '../components/ui';
@@ -15,6 +15,7 @@ export default function Wfh() {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={<Laptop className="h-5 w-5" />}
         title="Work from home"
         subtitle="Request and track work-from-home days"
         actions={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Request WFH</Button>}

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Search, UserX } from 'lucide-react';
+import { Briefcase, Pencil, Plus, Search, UserX } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Card, CountryTag, ErrorNote, Field, Modal, PageHeader, PersonCell, Spinner, StatusBadge, Toggle } from '../../components/ui';
@@ -43,7 +43,7 @@ export default function AdminEmployees() {
 
   return (
     <div>
-      <PageHeader title="Employee management" subtitle="Add employees, update roles and reporting lines" actions={<Button onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> Add employee</Button>} />
+      <PageHeader icon={<Briefcase className="h-5 w-5" />} title="Employee management" subtitle="Add employees, update roles and reporting lines" actions={<Button onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> Add employee</Button>} />
       <div className="mb-4 flex flex-wrap gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />

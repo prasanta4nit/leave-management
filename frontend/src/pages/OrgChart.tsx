@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Minus, Network, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Avatar, Button, Card, PageHeader, Spinner } from '../components/ui';
@@ -21,6 +21,7 @@ export default function OrgChart() {
   return (
     <div>
       <PageHeader
+        icon={<Network className="h-5 w-5" />}
         title="Organization chart"
         subtitle="Reporting hierarchy — who reports to whom"
         actions={

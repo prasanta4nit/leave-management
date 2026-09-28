@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { CalendarHeart, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Badge, Button, Card, CountryTag, EmptyState, ErrorNote, Field, Modal, PageHeader, Spinner, Tabs, Toggle } from '../components/ui';
 import { api, qs } from '../lib/api';
@@ -20,7 +20,7 @@ export default function Holidays() {
   const [tab, setTab] = useState<Tab>('holidays');
   return (
     <div className="space-y-6">
-      <PageHeader title="Holiday calendars" subtitle="Each country has its own holidays and weekend. Your calendar is chosen from your country." />
+      <PageHeader icon={<CalendarHeart className="h-5 w-5" />} title="Holiday calendars" subtitle="Each country has its own holidays and weekend. Your calendar is chosen from your country." />
       {me.is_hr && (
         <Tabs tabs={[{ value: 'holidays', label: 'Holidays' }, { value: 'calendars', label: 'Calendars & countries' }]} value={tab} onChange={setTab} />
       )}
@@ -122,7 +122,7 @@ function HolidayList() {
       {q.isLoading || cals.isLoading ? (
         <Spinner />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid items-start gap-6 lg:grid-cols-2">
           <Card title={`Holidays · ${mandatory.length}`} bodyClass="p-0">
             {mandatory.length ? <ul className="divide-y divide-slate-100">{mandatory.map(row)}</ul> : <EmptyState title={`No holidays in ${year}`} />}
           </Card>

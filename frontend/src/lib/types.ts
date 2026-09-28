@@ -225,4 +225,5 @@ export type Settings = Record<string, unknown> & {
   max_optional_holidays: number;
   max_wfh_days_per_month: number;
   notify_hr_on_leave: boolean;
+  show_celebrations: boolean;
 };

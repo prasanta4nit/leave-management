@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button, Card, CountryTag, ErrorNote, Field, Modal, PageHeader, PersonCell, Spinner } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -26,6 +27,7 @@ export default function Balances() {
   return (
     <div>
       <PageHeader
+        icon={<Wallet className="h-5 w-5" />}
         title="Leave balances"
         subtitle="Available / credited per employee. Click a cell to adjust a balance (recorded in the audit log)."
         actions={

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { Badge, Button, Card, CountryTag, ErrorNote, Field, Modal, PageHeader, Spinner, Toggle } from '../../components/ui';
@@ -34,6 +34,7 @@ export default function LeaveTypes() {
   return (
     <div>
       <PageHeader
+        icon={<SlidersHorizontal className="h-5 w-5" />}
         title="Leave types & policies"
         subtitle="Each leave type applies to specific countries (or all). Employees only see the types for their country."
         actions={

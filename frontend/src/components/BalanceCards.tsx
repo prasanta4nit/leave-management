@@ -1,56 +1,47 @@
+import { Infinity as InfinityIcon } from 'lucide-react';
 import type { Balance } from '../lib/types';
-
-export default function BalanceCards({ balances, compact }: { balances: Balance[]; compact?: boolean }) {
-  const visible = balances.filter((b) => !(b.leave_type_code && b.credited === 0 && b.used === 0 && b.pending === 0 && !b.is_unlimited && b.annual_quota === 0));
-  return (
-    <div className={compact ? 'grid grid-cols-2 gap-3 md:grid-cols-3' : 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4'}>
-      {visible.map((b) => {
-        const pctUsed = b.credited > 0 ? Math.min(100, (b.used / b.credited) * 100) : 0;
-        const pctPending = b.credited > 0 ? Math.min(100 - pctUsed, (b.pending / b.credited) * 100) : 0;
-        return (
-          <div key={b.leave_type_id} className="card p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: b.color }} />
-                <span className="text-sm font-medium text-slate-700">{b.leave_type_name}</span>
-              </div>
-              {!b.applicable ? (
-                <span className="text-[10px] font-semibold uppercase text-amber-600" title="Not part of the current country policy; shown because it was used this year">Previous policy</span>
-              ) : (
-                !b.is_paid && <span className="text-[10px] font-semibold uppercase text-slate-400">Unpaid</span>
-              )}
-            </div>
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="text-3xl font-semibold text-slate-900">{b.is_unlimited ? '∞' : round(b.available ?? 0)}</span>
-              <span className="text-sm text-slate-500">{b.is_unlimited ? 'no limit' : `of ${round(b.credited)} available`}</span>
-            </div>
-            {!b.is_unlimited && (
-              <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-slate-100" title={`Used ${b.used}, pending ${b.pending}`}>
-                <div style={{ width: `${pctUsed}%`, backgroundColor: b.color }} />
-                <div style={{ width: `${pctPending}%`, backgroundColor: b.color, opacity: 0.35 }} />
-              </div>
-            )}
-            {!compact && (
-              <dl className="mt-3 grid grid-cols-3 gap-1 text-xs">
-                <Stat label="Used" value={b.used} />
-                <Stat label="Pending" value={b.pending} />
-                <Stat label={b.carried_forward ? 'Carried fwd' : 'Accrued'} value={b.carried_forward || b.accrued || b.allocated + b.adjusted} />
-              </dl>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+import { ProgressRing } from './ui';
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
-function Stat({ label, value }: { label: string; value: number }) {
+/**
+ * Leave balances as rings: the coloured arc is what's still available, the faint arc is pending
+ * requests, and the grey track is what's been used.
+ */
+export default function BalanceCards({ balances, compact }: { balances: Balance[]; compact?: boolean }) {
   return (
-    <div>
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="font-medium text-slate-800">{round(value)}</dd>
+    <div className={compact ? 'grid grid-cols-1 gap-3 sm:grid-cols-2' : 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4'}>
+      {balances.map((b) => (
+        <div key={b.leave_type_id} className="card flex items-center gap-4 p-4 transition hover:shadow-lift">
+          {b.is_unlimited ? (
+            <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${b.color}12`, color: b.color }}>
+              <InfinityIcon className="h-7 w-7" />
+            </div>
+          ) : (
+            <ProgressRing value={Math.max(0, b.available ?? 0)} secondary={b.pending} max={b.credited} color={b.color} size={76} stroke={7}>
+              <span className="font-display text-xl font-bold leading-none text-slate-900">{round(b.available ?? 0)}</span>
+              <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400">left</span>
+            </ProgressRing>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-slate-800">{b.leave_type_name}</div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              {b.is_unlimited ? 'No fixed limit' : <>of <span className="font-medium text-slate-700">{round(b.credited)}</span> days{b.carried_forward ? ` · ${round(b.carried_forward)} carried over` : ''}</>}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              <span className="text-slate-500"><span className="font-semibold tabular-nums text-slate-700">{round(b.used)}</span> used</span>
+              <span className="text-slate-500"><span className="font-semibold tabular-nums text-slate-700">{round(b.pending)}</span> pending</span>
+            </div>
+            {!b.applicable ? (
+              <div className="mt-1.5 text-[11px] font-medium text-amber-600" title="Not part of the current country policy; shown because it was used this year">
+                Previous country policy
+              </div>
+            ) : !b.is_paid ? (
+              <div className="mt-1.5 text-[11px] font-medium text-slate-400">Unpaid</div>
+            ) : null}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { addMonths, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import LeaveApplyModal from '../components/LeaveApplyModal';
 import MonthCalendar from '../components/MonthCalendar';
@@ -29,7 +29,7 @@ export default function CalendarPage() {
 
   return (
     <div>
-      <PageHeader title="Team calendar" subtitle="Who's out, holidays and weekends at a glance. Click a day to apply for leave." />
+      <PageHeader icon={<CalendarDays className="h-5 w-5" />} title="Team calendar" subtitle="Who's out, holidays and weekends at a glance. Click a day to apply for leave." />
       <Card bodyClass="p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
           <div className="flex items-center gap-2">

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { ScrollText } from 'lucide-react';
 import { useState } from 'react';
 import { Card, EmptyState, PageHeader, Spinner } from '../../components/ui';
 import { api, qs } from '../../lib/api';
@@ -15,6 +16,7 @@ export default function AuditLog() {
   return (
     <div>
       <PageHeader
+        icon={<ScrollText className="h-5 w-5" />}
         title="Audit log"
         subtitle="Administrative changes. Approval decisions are in Approvals → History."
         actions={

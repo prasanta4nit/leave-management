@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Building2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Card, ErrorNote, Field, Modal, PageHeader, Spinner } from '../../components/ui';
@@ -26,8 +26,8 @@ export default function Organization() {
 
   return (
     <div>
-      <PageHeader title="Departments & designations" subtitle={<>Reporting hierarchy is managed per employee — see the <Link to="/org-chart" className="text-brand-600 hover:underline">org chart</Link>.</>} />
-      <div className="grid gap-6 lg:grid-cols-2">
+      <PageHeader icon={<Building2 className="h-5 w-5" />} title="Departments & designations" subtitle={<>Reporting hierarchy is managed per employee — see the <Link to="/org-chart" className="text-brand-600 hover:underline">org chart</Link>.</>} />
+      <div className="grid items-start gap-6 lg:grid-cols-2">
         <Card title="Departments" action={<Button size="sm" onClick={() => setDept('new')}><Plus className="h-3.5 w-3.5" /> Add</Button>} bodyClass="p-0">
           {depts.isLoading ? <Spinner /> : (
             <ul className="divide-y divide-slate-100">

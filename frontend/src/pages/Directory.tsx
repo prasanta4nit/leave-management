@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { LayoutGrid, List, Mail, Phone, Search } from 'lucide-react';
+import { LayoutGrid, List, Mail, Phone, Search, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Avatar, Card, CountryTag, EmptyState, PageHeader, PersonCell, Spinner } from '../components/ui';
@@ -33,7 +33,7 @@ export default function Directory() {
 
   return (
     <div>
-      <PageHeader title="Employee directory" subtitle={`${employees.data?.length ?? '…'} people`} />
+      <PageHeader icon={<Users className="h-5 w-5" />} title="Employee directory" subtitle={`${employees.data?.length ?? '…'} people`} />
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />

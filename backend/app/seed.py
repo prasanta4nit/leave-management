@@ -121,6 +121,12 @@ COUNTRY = {"EMP007": "IL", "EMP012": "IL", "EMP014": "UA", "EMP018": "UA", "EMP0
 CITY = {"IN": ("Bengaluru", "Pune"), "IL": ("Tel Aviv", "Haifa"), "UA": ("Kyiv", "Lviv")}
 
 
+def _demo_dob(n: int, today: date) -> date:
+    """Spread demo birthdays so a few always fall in the coming weeks."""
+    d = today + timedelta(days=(n * 17) % 365 - 3)
+    return date(1985 + n % 15, d.month, min(d.day, 28))
+
+
 def _workday(db, d: date, employee_id: int | None = None, direction: int = 1) -> date:
     while not workdays.working_dates(db, d, d, employee_id):
         d += timedelta(days=direction)
@@ -142,6 +148,7 @@ def seed(reset: bool = False) -> None:
         db.add_all([*depts.values(), *desigs.values()])
         db.flush()
 
+        today = date.today()
         emps: dict[str, Employee] = {}
         for code, first, last, desig, dept, _mgr, role, joined, etype, gender in EMPLOYEES:
             e = Employee(
@@ -155,6 +162,7 @@ def seed(reset: bool = False) -> None:
                 role=role,
                 employment_type=etype,
                 joining_date=date.fromisoformat(joined),
+                date_of_birth=_demo_dob(int(code[3:]), today),
                 gender=gender,
                 country_code=COUNTRY.get(code, "IN"),
                 location=CITY[COUNTRY.get(code, "IN")][int(code[3:]) % 2],
@@ -176,7 +184,6 @@ def seed(reset: bool = False) -> None:
         db.flush()
         db.refresh(emps["EMP001"])
 
-        today = date.today()
         for e in emps.values():
             for lt in balances.applicable_types(db, e):
                 balances.ensure_balance(db, e, lt, today.year, today)

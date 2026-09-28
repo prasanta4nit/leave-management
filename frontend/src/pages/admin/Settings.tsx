@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Play } from 'lucide-react';
+import { Play, Settings as SettingsIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button, Card, ErrorNote, Field, PageHeader, Spinner, Toggle } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -47,12 +47,13 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={<SettingsIcon className="h-5 w-5" />}
         title="System settings"
         subtitle={readOnly ? 'Read-only — only Admins can change settings' : 'Company, work week, approval workflow and notifications'}
         actions={!readOnly && <Button loading={save.isPending} onClick={() => save.mutate()}>Save changes</Button>}
       />
       <ErrorNote error={save.error} />
-      <fieldset disabled={readOnly} className="grid gap-6 lg:grid-cols-2">
+      <fieldset disabled={readOnly} className="grid items-start gap-6 lg:grid-cols-2">
         <Card title="Company & work week">
           <div className="space-y-4">
             <Field label="Company name"><input className="input" value={s.company_name} onChange={(e) => set('company_name', e.target.value)} /></Field>
@@ -104,6 +105,12 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <Field label="Send approval reminders after (hours)"><input type="number" min={1} className="input" value={s.reminder_after_hours} onChange={(e) => set('reminder_after_hours', Number(e.target.value))} /></Field>
             <Toggle label="CC HR on every leave application" checked={s.notify_hr_on_leave} onChange={(v) => set('notify_hr_on_leave', v)} />
+            <Toggle
+              label="Show birthdays and work anniversaries on the home page"
+              checked={s.show_celebrations}
+              onChange={(v) => set('show_celebrations', v)}
+            />
+            <p className="text-xs text-slate-500">Birthdays show the day and month only — never the year or age.</p>
           </div>
         </Card>
       </fieldset>

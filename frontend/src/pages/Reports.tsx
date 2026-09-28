@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileSpreadsheet } from 'lucide-react';
+import { BarChart3, Download, FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 import { Button, Card, EmptyState, PageHeader, Spinner, Tabs } from '../components/ui';
 import { api, download, qs } from '../lib/api';
@@ -60,6 +60,7 @@ export default function Reports() {
   return (
     <div>
       <PageHeader
+        icon={<BarChart3 className="h-5 w-5" />}
         title="Reports"
         subtitle={me.is_hr ? 'Organization-wide leave analytics' : 'Leave analytics for your reporting team'}
         actions={
