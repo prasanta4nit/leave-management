@@ -11,4 +11,11 @@ frontend/.env.local
 frontend/.env.production.local
 infra/.aws-sam/
 infra/samconfig.toml
+infra/terraform/.terraform/
+infra/terraform/.build/
+infra/terraform/terraform.tfvars
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/crash.log
+infra/terraform/tfplan
 .DS_Store

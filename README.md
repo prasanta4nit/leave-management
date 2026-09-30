@@ -83,6 +83,10 @@ Dev mode trusts an `X-Dev-User` header. **Never** deploy with `AUTH_MODE=dev`.
 
 ## Deploy to AWS
 
+Use Terraform when MySQL and SES already exist. It places the Lambda in your private subnets, opens MySQL to that Lambda, and sends mail through the SES identity you already verified. It does not create a database or an SES identity. Steps are in [infra/terraform/README.md](infra/terraform/README.md).
+
+### SAM (creates its own RDS instance and SES identity)
+
 Prerequisites: AWS CLI, SAM CLI, Node 20+, Python 3.12, and a VPC with **two private subnets that have NAT** (the Lambda calls Secrets Manager, SES, SSM and Cognito).
 
 ```bash

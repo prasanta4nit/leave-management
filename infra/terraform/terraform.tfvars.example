@@ -1,0 +1,33 @@
+aws_region = "ap-south-1"
+stage      = "prod"
+timezone   = "Asia/Kolkata"
+
+# Existing VPC. Private subnets must reach the database and, through NAT or
+# create_vpc_endpoints, reach SES, SSM, and Cognito.
+vpc_id = "vpc-0123456789abcdef0"
+private_subnet_ids = [
+  "subnet-0123456789abcdef0",
+  "subnet-0123456789abcdef1",
+]
+
+# Existing MySQL. The security group is the one already attached to the instance.
+# This stack only adds inbound TCP 3306 from the Lambda security group.
+db_security_group_id = "sg-0123456789abcdef0"
+db_host     = "leavedesk.xxxx.ap-south-1.rds.amazonaws.com"
+db_port     = 3306
+db_name     = "leave_mgmt"
+db_username = "leavedesk"
+db_password = "the-mysql-password"
+
+# Optional. Use this instead of db_username and db_password when the login
+# is already in Secrets Manager.
+# db_secret_arn  = "arn:aws:secretsmanager:ap-south-1:123456789012:secret:leavedesk/db-AbCdEf"
+# db_kms_key_arn = "arn:aws:kms:ap-south-1:123456789012:key/..."
+
+# Existing verified SES identity. Do not create a new one here.
+ses_region       = "ap-south-1"
+ses_sender       = "LeaveDesk <leave@yourcompany.com>"
+ses_identity_arn = "arn:aws:ses:ap-south-1:123456789012:identity/yourcompany.com"
+
+# Set true only when the private subnets have no NAT gateway.
+create_vpc_endpoints = false
