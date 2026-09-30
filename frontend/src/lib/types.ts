@@ -141,6 +141,7 @@ export interface LeaveRequest extends ApprovalFields {
   kind: 'LEAVE';
   leave_type: { id: number; code: string; name: string; color: string };
   duration_type: DurationType;
+  cc_emails?: string[];
   half_day_session: 'FIRST_HALF' | 'SECOND_HALF' | null;
 }
 

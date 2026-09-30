@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from .database import SessionLocal
 from .db_init import create_all
+from .db_upgrade import upgrade_schema
 from .holiday_data import install as install_calendars
 from .models import Department, Designation, Employee, LeaveType
 from .seed import LEAVE_TYPES
@@ -24,7 +25,7 @@ from .services import cognito, settings_service
 def bootstrap(event: dict) -> dict:
     create_all()
     db = SessionLocal()
-    result: dict = {"tables": "ok"}
+    result: dict = {"tables": "ok", "schema_upgrades": upgrade_schema()}
     try:
         if not db.scalar(select(LeaveType).limit(1)):
             db.add_all(LeaveType(**t) for t in LEAVE_TYPES)

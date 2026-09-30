@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from app.database import SessionLocal
 from app.models import Employee
 
-from .conftest import ADMIN, EMPLOYEE, HR, MANAGER
+from .conftest import ADMIN, EMPLOYEE, HR, MANAGER, REASON
 from .test_workflow import future_monday, leave_type_id
 
 
@@ -40,7 +40,7 @@ def test_anniversary_years(client):
 def test_notifications_awaiting_and_updates(client):
     lt = leave_type_id(client, "CASUAL")
     d = future_monday(9).isoformat()
-    leave = client.post("/api/leaves", json={"leave_type_id": lt, "start_date": d, "end_date": d}, headers=EMPLOYEE).json()
+    leave = client.post("/api/leaves", json={"reason": REASON, "leave_type_id": lt, "start_date": d, "end_date": d}, headers=EMPLOYEE).json()
     n = client.get("/api/dashboard/notifications", headers=MANAGER).json()
     assert any(a["id"] == leave["id"] for a in n["awaiting"]) and n["awaiting_count"] >= 1
     client.post(f"/api/approvals/leave/{leave['id']}/approve", json={}, headers=MANAGER)

@@ -132,6 +132,7 @@ def leave_request(r: LeaveRequest) -> dict:
         "half_day_session": r.half_day_session,
         "total_days": _f(r.total_days),
         "reason": r.reason,
+        "cc_emails": r.cc_emails or [],
         **_approval_fields(r),
     }
 

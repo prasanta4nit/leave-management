@@ -226,6 +226,9 @@ class LeaveRequest(ApprovalMixin, Base):
     half_day_session: Mapped[str | None] = mapped_column(String(20))
     total_days: Mapped[Decimal] = mapped_column(Numeric(6, 2))
     reason: Mapped[str | None] = mapped_column(String(1000))
+    # Extra people copied on this request's emails (application, decision, cancellation).
+    # Added after the first release: see app/db_upgrade.py.
+    cc_emails: Mapped[list[str] | None] = mapped_column(JSON)
 
     employee: Mapped[Employee] = relationship(foreign_keys=[employee_id])
     leave_type: Mapped[LeaveType] = relationship()

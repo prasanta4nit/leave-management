@@ -90,7 +90,15 @@ def _company(db: Session) -> str:
     return settings_service.get(db, "company_name")
 
 
-def request_submitted(db: Session, kind: str, req, modified: bool = False) -> list[Email]:
+def _request_cc(kind: str, req, exclude: list[str]) -> list[str]:
+    """People the applicant chose to copy (leave only), minus anyone already addressed."""
+    if kind != RequestKind.LEAVE.value:
+        return []
+    skip = {e.lower() for e in exclude}
+    return [e for e in (req.cc_emails or []) if e.lower() not in skip]
+
+
+def request_submitted(db: Session, kind: str, req, modified: bool = False, include_request_cc: bool = True) -> list[Email]:
     approvers = approvals.approvers_for(db, req)
     if not approvers:
         return []
@@ -100,10 +108,13 @@ def request_submitted(db: Session, kind: str, req, modified: bool = False) -> li
     title = f"{label} {verb} by {emp.full_name}"
     intro = f"{emp.full_name} has {verb} a {label.lower()} that needs your approval."
     body, text = _render(_company(db), title, intro, _describe(db, kind, req), "Review request", "/approvals")
+    to = [a.email for a in approvers]
     cc: list[str] = []
     if kind == RequestKind.LEAVE.value and settings_service.get(db, "notify_hr_on_leave"):
         cc = [h.email for h in approvals.hr_approvers(db, exclude_id=emp.id) if h not in approvers]
-    return [Email(to=[a.email for a in approvers], cc=cc, subject=f"[Action required] {title}", html=body, text=text)]
+    if include_request_cc:
+        cc += _request_cc(kind, req, exclude=to + cc + [emp.email])
+    return [Email(to=to, cc=cc, subject=f"[Action required] {title}", html=body, text=text)]
 
 
 def request_decided(db: Session, kind: str, req, outcome: str, actor: Employee) -> list[Email]:
@@ -113,7 +124,8 @@ def request_decided(db: Session, kind: str, req, outcome: str, actor: Employee) 
     emails: list[Email] = []
     if outcome == "ESCALATED":
         rows.append(("Manager approval", actor.full_name))
-        emails += request_submitted(db, kind, req)
+        # HR's "please approve" email: CC'd colleagues hear about the outcome below instead.
+        emails += request_submitted(db, kind, req, include_request_cc=False)
         title = f"Your {label.lower()} was approved by your manager"
         intro = f"{actor.full_name} approved your request. It is now awaiting final approval from HR."
     else:
@@ -123,7 +135,7 @@ def request_decided(db: Session, kind: str, req, outcome: str, actor: Employee) 
         if req.decision_comment:
             rows.append(("Comment", req.decision_comment))
     body, text = _render(_company(db), title, intro, rows, "View request", KIND_PATH[kind])
-    emails.append(Email(to=[emp.email], subject=title, html=body, text=text))
+    emails.append(Email(to=[emp.email], cc=_request_cc(kind, req, exclude=[emp.email]), subject=title, html=body, text=text))
     return emails
 
 
@@ -134,16 +146,23 @@ def request_cancelled(db: Session, kind: str, req, actor: Employee, notify: list
     if req.cancel_reason:
         rows.append(("Cancellation reason", req.cancel_reason))
     emails: list[Email] = []
-    recipients = [e.email for e in notify if e and e.id != actor.id]
+    recipients = sorted({e.email for e in notify if e and e.id != actor.id})
+    cc = _request_cc(kind, req, exclude=recipients + [emp.email, actor.email])
     if recipients:
         title = f"{label} cancelled by {actor.full_name}"
         intro = f"The following {label.lower()} for {emp.full_name} has been cancelled."
         body, text = _render(_company(db), title, intro, rows, "Open LeaveDesk", "/approvals")
-        emails.append(Email(to=sorted(set(recipients)), subject=title, html=body, text=text))
+        emails.append(Email(to=recipients, cc=cc, subject=title, html=body, text=text))
+        cc = []  # copied once
     if actor.id != emp.id:
         title = f"Your {label.lower()} was cancelled"
         body, text = _render(_company(db), title, f"{actor.full_name} cancelled your request.", rows, "View request", KIND_PATH[kind])
-        emails.append(Email(to=[emp.email], subject=title, html=body, text=text))
+        emails.append(Email(to=[emp.email], cc=cc, subject=title, html=body, text=text))
+    elif cc:
+        # Employee cancelled with no approver left to tell: still let the CC'd people know.
+        title = f"{label} cancelled by {emp.full_name}"
+        body, text = _render(_company(db), title, f"{emp.full_name} cancelled this {label.lower()}.", rows, "Open LeaveDesk", "/")
+        emails.append(Email(to=cc, subject=title, html=body, text=text))
     return emails
 
 

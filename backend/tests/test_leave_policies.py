@@ -3,7 +3,7 @@ from datetime import timedelta
 from app.database import SessionLocal
 from app.models import Employee, LeaveBalance, LeaveType
 
-from .conftest import ADMIN, HR, as_user
+from .conftest import ADMIN, HR, REASON, as_user
 from .test_workflow import future_monday, leave_type_id
 
 INDIA = as_user("rohan.das@acme.example")
@@ -41,7 +41,7 @@ def test_same_leave_name_different_rules_per_country(client):
 
 def test_cannot_apply_for_another_countrys_leave_type(client):
     day = (future_monday() + timedelta(days=1)).isoformat()
-    body = {"leave_type_id": leave_type_id(client, "CASUAL"), "start_date": day, "end_date": day}
+    body = {"reason": REASON, "leave_type_id": leave_type_id(client, "CASUAL"), "start_date": day, "end_date": day}
     r = client.post("/api/leaves", json=body, headers=ISRAEL)
     assert r.status_code == 400 and "not available" in r.json()["detail"]
     # HR applying on the employee's behalf is held to the same policy

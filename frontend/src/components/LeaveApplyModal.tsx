@@ -6,7 +6,10 @@ import { useMe } from '../lib/auth';
 import { fmtDate, fmtDays, isoDate } from '../lib/format';
 import { useToast } from '../lib/toast';
 import type { Balance, DurationType, EmployeeBrief, LeaveRequest, LeaveType } from '../lib/types';
+import EmailChips from './EmailChips';
 import { Button, ErrorNote, Field, Modal } from './ui';
+
+const REASON_MIN_LENGTH = 30; // keep in sync with LEAVE_REASON_MIN_LENGTH in backend/app/schemas.py
 
 interface Preview {
   total_days: number;
@@ -40,7 +43,7 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
   const employees = useQuery({
     queryKey: ['employees', 'all'],
     queryFn: () => api.get<EmployeeBrief[]>('/employees'),
-    enabled: open && me.is_hr && !existing,
+    enabled: open,
   });
 
   const [employeeId, setEmployeeId] = useState<number>(me.id);
@@ -56,6 +59,7 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
   const [end, setEnd] = useState(defaultDate ?? today);
   const [session, setSession] = useState<'FIRST_HALF' | 'SECOND_HALF'>('FIRST_HALF');
   const [reason, setReason] = useState('');
+  const [cc, setCc] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -67,6 +71,7 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
       setEnd(existing.end_date);
       setSession(existing.half_day_session ?? 'FIRST_HALF');
       setReason(existing.reason ?? '');
+      setCc(existing.cc_emails ?? []);
     } else {
       setEmployeeId(me.id);
       setTypeId('');
@@ -74,6 +79,7 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
       setStart(defaultDate ?? today);
       setEnd(defaultDate ?? today);
       setReason('');
+      setCc([]);
     }
   }, [open, existing, defaultDate, me.id, today]);
 
@@ -94,12 +100,17 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
             end_date: duration === 'FULL_DAY' ? end : start,
             duration_type: duration,
             half_day_session: duration === 'HALF_DAY' ? session : null,
-            reason: reason || null,
+            reason: reason.trim(),
+            cc_emails: cc,
             employee_id: employeeId !== me.id ? employeeId : null,
           },
-    [typeId, start, end, duration, session, reason, employeeId, me.id],
+    [typeId, start, end, duration, session, reason, cc, employeeId, me.id],
   );
-  const previewBody = useDebounced(body ? { ...body, reason: null } : null);
+  // The day-count preview only depends on type and dates.
+  const previewBody = useDebounced(body ? { ...body, reason: null, cc_emails: undefined } : null);
+  const reasonLength = reason.trim().length;
+  const reasonOk = reasonLength >= REASON_MIN_LENGTH;
+  const applicant = employeeId === me.id ? me : employees.data?.find((e) => e.id === employeeId);
   const preview = useQuery({
     queryKey: ['leave-preview', previewBody, existing?.id],
     queryFn: () => api.post<Preview>(`/leaves/preview${qs({ exclude_id: existing?.id })}`, previewBody),
@@ -130,7 +141,7 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => submit.mutate()} loading={submit.isPending} disabled={!body || preview.isError}>
+          <Button onClick={() => submit.mutate()} loading={submit.isPending} disabled={!body || preview.isError || !reasonOk}>
             {existing ? 'Save & resubmit' : 'Submit request'}
           </Button>
         </>
@@ -207,9 +218,39 @@ export default function LeaveApplyModal({ open, onClose, existing, defaultDate }
           </div>
         )}
 
-        <Field label="Reason">
-          <textarea className="input min-h-[80px]" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional note for your approver" maxLength={1000} />
-        </Field>
+        <div>
+          <label htmlFor="leave-reason" className="label">
+            Reason <span className="text-rose-500">*</span>
+          </label>
+          <textarea
+            id="leave-reason"
+            className="input min-h-[88px]"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Tell your approver why you need this time off"
+            maxLength={1000}
+            required
+            aria-describedby="leave-reason-count"
+          />
+          <p id="leave-reason-count" className={clsx('mt-1 text-xs', reasonOk ? 'text-emerald-600' : 'text-slate-500')}>
+            {reasonOk ? `✓ ${reasonLength} characters` : `${reasonLength} / ${REASON_MIN_LENGTH} characters minimum`}
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="leave-cc" className="label">
+            CC <span className="font-normal text-slate-400">(optional)</span>
+          </label>
+          <EmailChips
+            id="leave-cc"
+            value={cc}
+            onChange={setCc}
+            people={employees.data ?? []}
+            exclude={applicant ? [applicant.email] : []}
+            placeholder="Add colleagues by name or email"
+          />
+          <p className="mt-1 text-xs text-slate-500">They're copied on this request, the decision and any cancellation. Your approver is emailed automatically.</p>
+        </div>
 
         {preview.isError && <ErrorNote error={preview.error} />}
         {preview.data && !preview.isError && (

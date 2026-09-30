@@ -78,6 +78,7 @@ export default function RequestDetailModal({ kind, id, onClose }: { kind: Reques
               {r.decided_by && <Item label="Decided by">{r.decided_by.full_name}</Item>}
               {r.decided_at && <Item label="Decided on">{fmtDate(r.decided_at)}</Item>}
               <Item label="Reason" wide>{r.reason || <span className="text-slate-400">No reason given</span>}</Item>
+              {r.kind === 'LEAVE' && !!r.cc_emails?.length && <Item label="CC" wide>{r.cc_emails.join(', ')}</Item>}
               {r.decision_comment && <Item label="Approver comment" wide>{r.decision_comment}</Item>}
               {r.cancel_reason && <Item label="Cancellation reason" wide>{r.cancel_reason}</Item>}
             </dl>

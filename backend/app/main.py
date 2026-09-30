@@ -7,11 +7,15 @@ from mangum import Mangum
 
 from .config import get_settings
 from .database import SessionLocal
+from .db_upgrade import upgrade_schema_safely
 from .routers import admin, approvals, calendar, catalog, dashboard, employees, leaves, reports, services
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Add columns introduced after the first release (idempotent, runs once per process/Lambda instance).
+upgrade_schema_safely()
 
 app = FastAPI(title=f"{settings.app_name} API", version="1.0.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
 app.add_middleware(

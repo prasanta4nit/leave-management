@@ -4,7 +4,7 @@ from app.database import SessionLocal
 from app.models import Employee, LeaveType
 from app.services import balances, settings_service
 
-from .conftest import ADMIN, EMPLOYEE, HR, MANAGER, OTHER
+from .conftest import ADMIN, EMPLOYEE, HR, MANAGER, OTHER, REASON
 
 
 def next_weekday(start: date, weekday: int) -> date:
@@ -56,7 +56,7 @@ def test_apply_approve_flow_and_balance(client):
     start = future_monday()
     r = client.post(
         "/api/leaves",
-        json={"leave_type_id": lt, "start_date": start.isoformat(), "end_date": (start + timedelta(days=1)).isoformat(), "reason": "Errands"},
+        json={"leave_type_id": lt, "start_date": start.isoformat(), "end_date": (start + timedelta(days=1)).isoformat(), "reason": REASON},
         headers=EMPLOYEE,
     )
     assert r.status_code == 201, r.text
@@ -92,7 +92,7 @@ def test_reject_requires_comment_and_hr_override(client):
     lt = leave_type_id(client, "CASUAL")
     start = future_monday(4)
     leave = client.post(
-        "/api/leaves", json={"leave_type_id": lt, "start_date": start.isoformat(), "end_date": start.isoformat()}, headers=EMPLOYEE
+        "/api/leaves", json={"reason": REASON, "leave_type_id": lt, "start_date": start.isoformat(), "end_date": start.isoformat()}, headers=EMPLOYEE
     ).json()
     assert client.post(f"/api/approvals/leave/{leave['id']}/reject", json={}, headers=MANAGER).status_code == 400
     r = client.post(f"/api/approvals/leave/{leave['id']}/reject", json={"comment": "Release week"}, headers=MANAGER)
@@ -110,7 +110,7 @@ def test_two_level_approval(client):
     lt = leave_type_id(client, "CASUAL")
     start = future_monday(5)
     leave = client.post(
-        "/api/leaves", json={"leave_type_id": lt, "start_date": start.isoformat(), "end_date": start.isoformat()}, headers=EMPLOYEE
+        "/api/leaves", json={"reason": REASON, "leave_type_id": lt, "start_date": start.isoformat(), "end_date": start.isoformat()}, headers=EMPLOYEE
     ).json()
     r = client.post(f"/api/approvals/leave/{leave['id']}/approve", json={}, headers=MANAGER)
     assert r.json()["outcome"] == "ESCALATED"
@@ -125,16 +125,16 @@ def test_insufficient_balance_and_overlap(client):
     # Casual allows max 3 consecutive days
     r = client.post(
         "/api/leaves",
-        json={"leave_type_id": lt, "start_date": start.isoformat(), "end_date": (start + timedelta(days=3)).isoformat()},
+        json={"reason": REASON, "leave_type_id": lt, "start_date": start.isoformat(), "end_date": (start + timedelta(days=3)).isoformat()},
         headers=EMPLOYEE,
     )
     assert r.status_code == 400 and "consecutive" in r.json()["detail"]
     ok = client.post(
-        "/api/leaves", json={"leave_type_id": lt, "start_date": start.isoformat(), "end_date": start.isoformat()}, headers=EMPLOYEE
+        "/api/leaves", json={"reason": REASON, "leave_type_id": lt, "start_date": start.isoformat(), "end_date": start.isoformat()}, headers=EMPLOYEE
     )
     assert ok.status_code == 201
     dup = client.post(
-        "/api/leaves", json={"leave_type_id": lt, "start_date": start.isoformat(), "end_date": start.isoformat()}, headers=EMPLOYEE
+        "/api/leaves", json={"reason": REASON, "leave_type_id": lt, "start_date": start.isoformat(), "end_date": start.isoformat()}, headers=EMPLOYEE
     )
     assert dup.status_code == 400 and "Overlaps" in dup.json()["detail"]
 
@@ -142,7 +142,7 @@ def test_insufficient_balance_and_overlap(client):
 def test_half_day_sessions_can_share_a_date(client):
     lt = leave_type_id(client, "CASUAL")
     d = future_monday(7).isoformat()
-    base = {"leave_type_id": lt, "start_date": d, "end_date": d, "duration_type": "HALF_DAY"}
+    base = {"reason": REASON, "leave_type_id": lt, "start_date": d, "end_date": d, "duration_type": "HALF_DAY"}
     assert client.post("/api/leaves", json={**base, "half_day_session": "FIRST_HALF"}, headers=EMPLOYEE).status_code == 201
     assert client.post("/api/leaves", json={**base, "half_day_session": "FIRST_HALF"}, headers=EMPLOYEE).status_code == 400
     r = client.post("/api/leaves", json={**base, "half_day_session": "SECOND_HALF"}, headers=EMPLOYEE)
@@ -154,7 +154,7 @@ def test_hourly_leave_not_supported(client):
     d = future_monday(8).isoformat()
     r = client.post(
         "/api/leaves",
-        json={"leave_type_id": lt, "start_date": d, "end_date": d, "duration_type": "HOURLY"},
+        json={"reason": REASON, "leave_type_id": lt, "start_date": d, "end_date": d, "duration_type": "HOURLY"},
         headers=EMPLOYEE,
     )
     assert r.status_code == 422  # only FULL_DAY and HALF_DAY exist

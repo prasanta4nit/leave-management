@@ -130,7 +130,13 @@ class LeaveTypeIn(BaseModel):
         return sorted({_country(c) for c in v})
 
 
-class LeaveApply(BaseModel):
+LEAVE_REASON_MIN_LENGTH = 30
+LEAVE_MAX_CC = 10
+
+
+class LeaveDraft(BaseModel):
+    """Leave dates and type. Used on its own for the live day-count preview."""
+
     leave_type_id: int
     start_date: date
     end_date: date
@@ -148,6 +154,31 @@ class LeaveApply(BaseModel):
         if self.duration_type == DurationType.HALF_DAY and self.half_day_session is None:
             raise ValueError("Select first half or second half")
         return self
+
+
+class LeaveApply(LeaveDraft):
+    """Submitting or modifying a leave: a written reason is required and people can be CC'd."""
+
+    reason: str = Field(max_length=1000)
+    cc_emails: list[EmailStr] = Field(default_factory=list, max_length=LEAVE_MAX_CC)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < LEAVE_REASON_MIN_LENGTH:
+            raise ValueError(f"Please give a reason of at least {LEAVE_REASON_MIN_LENGTH} characters ({len(v)} so far)")
+        return v
+
+    @field_validator("cc_emails")
+    @classmethod
+    def _cc(cls, v: list[str]) -> list[str]:
+        seen: list[str] = []
+        for e in v:
+            e = str(e).strip().lower()
+            if e not in seen:
+                seen.append(e)
+        return seen
 
 
 class Decision(BaseModel):

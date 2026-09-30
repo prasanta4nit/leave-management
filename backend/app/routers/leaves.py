@@ -9,7 +9,7 @@ from .. import serializers as S
 from ..auth import can_view_private, get_current_user, subordinate_ids
 from ..database import get_db
 from ..models import DurationType, Employee, LeaveRequest, LeaveType, RequestKind, RequestStatus
-from ..schemas import CancelIn, LeaveApply
+from ..schemas import CancelIn, LeaveApply, LeaveDraft
 from ..services import approvals, balances, notifications, workdays
 
 router = APIRouter(prefix="/leaves", tags=["leaves"])
@@ -42,7 +42,7 @@ def _target_employee(db: Session, user: Employee, employee_id: int | None) -> Em
     return emp
 
 
-def evaluate(db: Session, actor: Employee, emp: Employee, body: LeaveApply, exclude_id: int | None = None) -> dict:
+def evaluate(db: Session, actor: Employee, emp: Employee, body: LeaveDraft, exclude_id: int | None = None) -> dict:
     """Validate a leave application and compute its cost in days. Raises HTTPException on rule violations."""
     lt = db.get(LeaveType, body.leave_type_id)
     if lt is None or not lt.is_active:
@@ -131,9 +131,26 @@ def my_balances(year: int | None = None, db: Session = Depends(get_db), user: Em
     return result
 
 
+def clean_cc(db: Session, emp: Employee, emails: list[str]) -> list[str] | None:
+    """CC is limited to the company's own email domains (taken from employee addresses), so the
+    app can't be used to email arbitrary outside addresses. The applicant is dropped - they get
+    their own emails anyway."""
+    if not emails:
+        return None
+    domains = {e.split("@")[-1].lower() for e in db.scalars(select(Employee.email).where(Employee.status == "ACTIVE"))}
+    outside = [e for e in emails if e.split("@")[-1] not in domains]
+    if outside:
+        raise HTTPException(
+            400,
+            f"CC can only include company addresses ({', '.join('@' + d for d in sorted(domains))}). Not allowed: {', '.join(outside)}",
+        )
+    cleaned = [e for e in emails if e != emp.email.lower()]
+    return cleaned or None
+
+
 @router.post("/preview")
 def preview(
-    body: LeaveApply,
+    body: LeaveDraft,
     exclude_id: int | None = None,
     db: Session = Depends(get_db),
     user: Employee = Depends(get_current_user),
@@ -164,6 +181,7 @@ def apply_leave(
 ):
     emp = _target_employee(db, user, body.employee_id)
     result = evaluate(db, user, emp, body)
+    cc = clean_cc(db, emp, body.cc_emails)
     req = LeaveRequest(
         employee_id=emp.id,
         leave_type_id=body.leave_type_id,
@@ -173,6 +191,7 @@ def apply_leave(
         half_day_session=body.half_day_session.value if body.duration_type == DurationType.HALF_DAY else None,
         total_days=result["total_days"],
         reason=body.reason,
+        cc_emails=cc,
     )
     db.add(req)
     approvals.route_initial(db, KIND, req, emp)
@@ -257,6 +276,7 @@ def modify_leave(
     req.half_day_session = body.half_day_session.value if body.duration_type == DurationType.HALF_DAY else None
     req.total_days = result["total_days"]
     req.reason = body.reason
+    req.cc_emails = clean_cc(db, emp, body.cc_emails)
     req.decided_by_id = None
     req.decided_at = None
     req.decision_comment = None

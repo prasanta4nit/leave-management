@@ -33,3 +33,6 @@ HR = as_user("priya.sharma@acme.example")
 MANAGER = as_user("vikram.singh@acme.example")  # Tech Lead; manages engineers
 EMPLOYEE = as_user("rohan.das@acme.example")  # reports to Vikram
 OTHER = as_user("pooja.rao@acme.example")  # sales, unrelated to engineering
+
+# Leave applications need a reason of at least 30 characters.
+REASON = "Family function out of town, back on Monday"
