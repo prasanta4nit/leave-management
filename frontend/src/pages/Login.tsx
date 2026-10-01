@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2, FlaskConical, Globe, Palmtree, Search } from 
 import { Avatar, Badge, Button, CountryTag, ErrorNote, Field } from '../components/ui';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { confirmPassword, forgotPassword } from '../lib/cognito';
+import { confirmPassword, describeAuthError, forgotPassword } from '../lib/cognito';
 import { config } from '../lib/config';
 
 type DevUser = { id: number; email: string; full_name: string; role: string; designation: string | null; country_code: string | null };
@@ -113,7 +113,7 @@ function CognitoLogin() {
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeAuthError(e));
     } finally {
       setBusy(false);
     }
@@ -180,8 +180,8 @@ function CognitoLogin() {
           onSubmit={(e) => {
             e.preventDefault();
             void run(async () => {
-              await forgotPassword(email);
-              setInfo('We emailed you a verification code.');
+              const sentTo = await forgotPassword(email);
+              setInfo(`We emailed a verification code to ${sentTo ?? email}. It can take a minute; check your spam folder too.`);
               setMode('reset');
             });
           }}

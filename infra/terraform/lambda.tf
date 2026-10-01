@@ -39,6 +39,9 @@ data "aws_iam_policy_document" "lambda" {
     ]
     resources = [
       var.ses_identity_arn != "" ? var.ses_identity_arn : "arn:aws:ses:${local.ses_region}:${data.aws_caller_identity.current.account_id}:identity/*",
+      # When the identity has a default configuration set (e.g. for bounce/open tracking), SES also
+      # checks permission on that configuration set. Without this every send fails with AccessDenied.
+      "arn:aws:ses:${local.ses_region}:${data.aws_caller_identity.current.account_id}:configuration-set/*",
     ]
   }
 

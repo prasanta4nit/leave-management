@@ -2,6 +2,7 @@ import json
 from functools import lru_cache
 from urllib.parse import quote_plus
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +26,15 @@ class Settings(BaseSettings):
     cognito_user_pool_id: str = ""
     cognito_app_client_id: str = ""
     cognito_provision_users: bool = True
+
+    @field_validator("auth_mode")
+    @classmethod
+    def _auth_mode(cls, v: str) -> str:
+        # "Cognito" in a .env must not silently turn off user provisioning (which checks == "cognito").
+        mode = v.strip().lower()
+        if mode not in ("cognito", "dev"):
+            raise ValueError(f"AUTH_MODE must be 'cognito' or 'dev', got {v!r}")
+        return mode
 
     email_enabled: bool = False
     ses_region: str = "us-east-1"

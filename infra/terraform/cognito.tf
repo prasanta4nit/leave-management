@@ -64,7 +64,10 @@ resource "aws_cognito_user_pool_client" "web" {
     "ALLOW_USER_SRP_AUTH",
     "ALLOW_REFRESH_TOKEN_AUTH",
   ]
-  prevent_user_existence_errors = "ENABLED"
+  # LEGACY: an email with no LeaveDesk account gets a clear "no account" error on sign-in and
+  # "forgot password", instead of Cognito pretending a code was sent. Trade-off: someone could use
+  # this to test which addresses have accounts; Cognito's request throttling limits that.
+  prevent_user_existence_errors = "LEGACY"
 
   access_token_validity  = 1
   id_token_validity      = 1
