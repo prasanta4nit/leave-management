@@ -41,7 +41,7 @@ terraform apply
 
 ## Frontend
 
-From the repo root, after apply:
+From the repo root. This only writes `frontend/dist`. It does not run `terraform apply` or upload the site.
 
 ```bash
 bash scripts/deploy-frontend-terraform.sh

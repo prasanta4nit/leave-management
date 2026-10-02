@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Builds the Lambda bundle (Linux arm64 / Python 3.12) into backend/build without Docker.
+# Does not run terraform apply. Run that yourself from infra/terraform.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/backend/build"
