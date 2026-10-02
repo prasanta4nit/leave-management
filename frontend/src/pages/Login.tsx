@@ -22,8 +22,8 @@ export default function Login() {
         <div className="pointer-events-none absolute -left-20 top-1/3 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 right-0 h-96 w-96 rounded-full bg-fuchsia-400/20 blur-3xl" />
         <div className="relative flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white font-display text-lg font-extrabold text-brand-700">L</div>
-          <span className="font-display text-xl font-bold">LeaveDesk</span>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white font-display text-lg font-extrabold text-brand-700">E</div>
+          <span className="font-display text-xl font-bold">Employee Desk</span>
         </div>
         <div className="relative my-auto max-w-md">
           <h1 className="font-display text-4xl font-bold leading-tight tracking-tight">Your time off,<br />without the paperwork.</h1>
@@ -43,8 +43,8 @@ export default function Login() {
       <main className="flex items-center justify-center bg-canvas px-4 py-12 sm:px-8">
         <div className="w-full max-w-md">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 font-display text-lg font-extrabold text-white">L</div>
-            <span className="font-display text-xl font-bold text-slate-900">LeaveDesk</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 font-display text-lg font-extrabold text-white">E</div>
+            <span className="font-display text-xl font-bold text-slate-900">Employee Desk</span>
           </div>
           {config.authMode === 'dev' ? <DevLogin /> : <CognitoLogin />}
         </div>

@@ -32,7 +32,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
 
 resource "aws_cloudfront_origin_access_control" "frontend" {
   name                              = "${local.name}-oac"
-  description                       = "LeaveDesk frontend bucket"
+  description                       = "Employee Desk frontend bucket"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
@@ -54,7 +54,7 @@ resource "aws_cloudfront_function" "spa_rewrite" {
 
 resource "aws_cloudfront_distribution" "web" {
   enabled             = true
-  comment             = "LeaveDesk ${var.stage}"
+  comment             = "Employee Desk ${var.stage}"
   default_root_object = "index.html"
   price_class         = "PriceClass_200"
   http_version        = "http2and3"
@@ -138,9 +138,49 @@ resource "aws_s3_bucket_policy" "frontend" {
   })
 }
 
+locals {
+  frontend_dist = "${path.module}/../../frontend/dist"
+  frontend_content_types = {
+    css   = "text/css"
+    html  = "text/html"
+    js    = "application/javascript"
+    svg   = "image/svg+xml"
+    json  = "application/json"
+    png   = "image/png"
+    ico   = "image/x-icon"
+    woff  = "font/woff"
+    woff2 = "font/woff2"
+  }
+}
+
+resource "aws_s3_object" "frontend" {
+  for_each = fileset(local.frontend_dist, "**")
+
+  bucket        = aws_s3_bucket.frontend.id
+  key           = each.value
+  source        = "${local.frontend_dist}/${each.value}"
+  etag          = filemd5("${local.frontend_dist}/${each.value}")
+  content_type  = lookup(local.frontend_content_types, lower(element(reverse(split(".", each.value)), 0)), "application/octet-stream")
+  cache_control = each.value == "index.html" ? "no-cache" : "public,max-age=31536000,immutable"
+
+  depends_on = [
+    aws_s3_bucket_ownership_controls.frontend,
+    aws_s3_bucket_public_access_block.frontend,
+    aws_s3_bucket_server_side_encryption_configuration.frontend,
+  ]
+}
+
+resource "terraform_data" "frontend_invalidation" {
+  triggers_replace = [aws_s3_object.frontend["index.html"].etag]
+
+  provisioner "local-exec" {
+    command = "aws cloudfront create-invalidation --distribution-id ${aws_cloudfront_distribution.web.id} --paths /index.html /"
+  }
+}
+
 resource "aws_ssm_parameter" "app_url" {
   name        = local.app_url_param_name
-  description = "Public LeaveDesk URL used in email links"
+  description = "Public Employee Desk URL used in email links"
   type        = "String"
   value       = "https://${aws_cloudfront_distribution.web.domain_name}"
 }

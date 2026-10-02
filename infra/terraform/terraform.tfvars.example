@@ -26,7 +26,7 @@ db_password = "the-mysql-password"
 
 # Existing verified SES identity. Do not create a new one here.
 ses_region       = "ap-south-1"
-ses_sender       = "LeaveDesk <leave@yourcompany.com>"
+ses_sender       = "Employee Desk <leave@yourcompany.com>"
 ses_identity_arn = "arn:aws:ses:ap-south-1:123456789012:identity/yourcompany.com"
 
 # Set true only when the private subnets have no NAT gateway.

@@ -1,4 +1,4 @@
-# LeaveDesk — Leave & Employee Management
+# Employee Desk — Leave & Employee Management
 
 A leave and employee management system for a 20–25 person company.
 

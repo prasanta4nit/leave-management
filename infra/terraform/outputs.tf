@@ -1,5 +1,5 @@
 output "app_url" {
-  description = "LeaveDesk web app"
+  description = "Employee Desk web app"
   value       = "https://${aws_cloudfront_distribution.web.domain_name}"
 }
 

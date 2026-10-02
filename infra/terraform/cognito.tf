@@ -8,10 +8,10 @@ resource "aws_cognito_user_pool" "this" {
     allow_admin_create_user_only = true
 
     invite_message_template {
-      email_subject = "Your LeaveDesk account"
-      email_message = "Welcome to LeaveDesk! Sign in with username {username} and temporary password {####}. You'll be asked to choose a new password. Your HR team will share the app link."
+      email_subject = "Your Employee Desk account"
+      email_message = "Welcome to Employee Desk! Sign in with username {username} and temporary password {####}. You'll be asked to choose a new password. Your HR team will share the app link."
       # Cognito requires an SMS template whenever the invite template is set, even though invites are sent by email.
-      sms_message = "LeaveDesk username {username}, temporary password {####}."
+      sms_message = "Employee Desk username {username}, temporary password {####}."
     }
   }
 
@@ -64,7 +64,7 @@ resource "aws_cognito_user_pool_client" "web" {
     "ALLOW_USER_SRP_AUTH",
     "ALLOW_REFRESH_TOKEN_AUTH",
   ]
-  # LEGACY: an email with no LeaveDesk account gets a clear "no account" error on sign-in and
+  # LEGACY: an email with no Employee Desk account gets a clear "no account" error on sign-in and
   # "forgot password", instead of Cognito pretending a code was sent. Trade-off: someone could use
   # this to test which addresses have accounts; Cognito's request throttling limits that.
   prevent_user_existence_errors = "LEGACY"

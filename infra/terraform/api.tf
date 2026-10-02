@@ -1,7 +1,7 @@
 resource "aws_apigatewayv2_api" "http" {
   name          = local.name
   protocol_type = "HTTP"
-  description   = "LeaveDesk API"
+  description   = "Employee Desk API"
 
   cors_configuration {
     # Production traffic is same-origin through CloudFront. This list is for local dev.

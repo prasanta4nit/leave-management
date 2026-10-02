@@ -37,7 +37,7 @@ variable "private_subnet_ids" {
 
 variable "db_security_group_id" {
   type        = string
-  description = "Security group attached to the existing MySQL instance. LeaveDesk adds an inbound rule for the Lambda on db_port."
+  description = "Security group attached to the existing MySQL instance. Employee Desk adds an inbound rule for the Lambda on db_port."
 }
 
 variable "create_db_ingress_rule" {
@@ -106,7 +106,7 @@ variable "ses_region" {
 
 variable "ses_sender" {
   type        = string
-  description = "From address on the existing verified SES identity, for example LeaveDesk <leave@yourcompany.com>."
+  description = "From address on the existing verified SES identity, for example Employee Desk <leave@yourcompany.com>."
 }
 
 variable "ses_identity_arn" {

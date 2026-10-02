@@ -97,7 +97,7 @@ resource "aws_cloudwatch_log_group" "api" {
 
 resource "aws_lambda_function" "api" {
   function_name = "${local.name}-api"
-  description   = "LeaveDesk FastAPI and scheduled jobs"
+  description   = "Employee Desk FastAPI and scheduled jobs"
   role          = aws_iam_role.lambda.arn
   runtime       = "python3.12"
   architectures = ["arm64"]

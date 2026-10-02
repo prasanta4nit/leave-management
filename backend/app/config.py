@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    app_name: str = "LeaveDesk"
+    app_name: str = "Employee Desk"
     environment: str = "dev"
 
     # Either a full SQLAlchemy URL, or a Secrets Manager ARN holding
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     email_enabled: bool = False
     ses_region: str = "us-east-1"
-    ses_sender: str = "LeaveDesk <noreply@example.com>"
+    ses_sender: str = "Employee Desk <noreply@example.com>"
 
     frontend_url: str = "http://localhost:5173"
     # When set, the app URL is read from this SSM parameter (avoids a CloudFormation cycle).

@@ -52,13 +52,13 @@ def _render(company: str, title: str, intro: str, rows: list[tuple[str, str]], c
     body = f"""<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:Segoe UI,Helvetica,Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 12px">
 <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden">
-<tr><td style="background:#4f46e5;color:#fff;padding:18px 24px;font-size:18px;font-weight:600">{html.escape(company)} · LeaveDesk</td></tr>
+<tr><td style="background:#4f46e5;color:#fff;padding:18px 24px;font-size:18px;font-weight:600">{html.escape(company)} · Employee Desk</td></tr>
 <tr><td style="padding:24px"><h2 style="margin:0 0 8px;color:#0f172a;font-size:20px">{html.escape(title)}</h2>
 <p style="margin:0 0 16px;color:#334155;line-height:1.5">{html.escape(intro)}</p>
 <table cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;width:100%">{row_html}</table>
 <p style="margin:24px 0 0"><a href="{url}" style="background:#4f46e5;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;display:inline-block">{html.escape(cta_label)}</a></p>
 </td></tr>
-<tr><td style="padding:16px 24px;color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0">This is an automated message from LeaveDesk. Please do not reply.</td></tr>
+<tr><td style="padding:16px 24px;color:#94a3b8;font-size:12px;border-top:1px solid #e2e8f0">This is an automated message from Employee Desk. Please do not reply.</td></tr>
 </table></td></tr></table></body></html>"""
     text = f"{title}\n\n{intro}\n\n" + "\n".join(f"{k}: {v}" for k, v in rows) + f"\n\n{cta_label}: {url}\n"
     return body, text
@@ -151,7 +151,7 @@ def request_cancelled(db: Session, kind: str, req, actor: Employee, notify: list
     if recipients:
         title = f"{label} cancelled by {actor.full_name}"
         intro = f"The following {label.lower()} for {emp.full_name} has been cancelled."
-        body, text = _render(_company(db), title, intro, rows, "Open LeaveDesk", "/approvals")
+        body, text = _render(_company(db), title, intro, rows, "Open Employee Desk", "/approvals")
         emails.append(Email(to=recipients, cc=cc, subject=title, html=body, text=text))
         cc = []  # copied once
     if actor.id != emp.id:
@@ -161,7 +161,7 @@ def request_cancelled(db: Session, kind: str, req, actor: Employee, notify: list
     elif cc:
         # Employee cancelled with no approver left to tell: still let the CC'd people know.
         title = f"{label} cancelled by {emp.full_name}"
-        body, text = _render(_company(db), title, f"{emp.full_name} cancelled this {label.lower()}.", rows, "Open LeaveDesk", "/")
+        body, text = _render(_company(db), title, f"{emp.full_name} cancelled this {label.lower()}.", rows, "Open Employee Desk", "/")
         emails.append(Email(to=cc, subject=title, html=body, text=text))
     return emails
 

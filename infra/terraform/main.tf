@@ -1,4 +1,4 @@
-# LeaveDesk on AWS, using a database and SES identity that already exist.
+# Employee Desk on AWS, using a database and SES identity that already exist.
 # This stack creates Cognito, the API Lambda, HTTP API, EventBridge schedules,
 # and the S3 + CloudFront site. It does not create a VPC, RDS instance, or SES identity.
 

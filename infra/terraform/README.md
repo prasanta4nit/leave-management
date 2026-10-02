@@ -1,4 +1,4 @@
-# LeaveDesk on AWS (Terraform)
+# Employee Desk on AWS (Terraform)
 
 Deploys the web app and API into an existing VPC. It does **not** create the MySQL database or the SES identity.
 
@@ -41,10 +41,12 @@ terraform apply
 
 ## Frontend
 
-From the repo root. This only writes `frontend/dist`. It does not run `terraform apply` or upload the site.
+From the repo root, build the site, then apply. The build script does not upload anything. `terraform apply` uploads `frontend/dist` to the site bucket.
 
 ```bash
 bash scripts/deploy-frontend-terraform.sh
+cd infra/terraform
+terraform apply
 ```
 
 ## First admin

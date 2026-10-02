@@ -89,7 +89,7 @@ export function describeAuthError(e: unknown): string {
   const msg = err?.message ?? String(e);
   switch (code) {
     case 'UserNotFoundException':
-      return "There's no LeaveDesk account for this email. Use your work email, or ask HR to add you.";
+      return "There's no Employee Desk account for this email. Use your work email, or ask HR to add you.";
     case 'NotAuthorizedException':
       if (/cannot be reset in the current state/i.test(msg))
         return "Your account isn't activated yet. Sign in with the temporary password from your invite email, or ask HR to resend the invite.";

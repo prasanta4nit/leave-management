@@ -115,11 +115,11 @@ export default function Layout() {
       >
         <div className={clsx('flex h-16 shrink-0 items-center gap-2.5', rail ? 'justify-center px-2' : 'px-5')}>
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 font-display text-base font-extrabold text-white shadow-sm shadow-brand-600/30">
-            L
+            E
           </div>
           {!rail && (
             <div className="min-w-0 flex-1">
-              <div className="font-display text-[15px] font-bold leading-tight text-slate-900">LeaveDesk</div>
+              <div className="font-display text-[15px] font-bold leading-tight text-slate-900">Employee Desk</div>
               <div className="truncate text-[11px] text-slate-500">{me.settings.company_name}</div>
             </div>
           )}

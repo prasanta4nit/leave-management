@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  LeaveDesk - Leave & Employee Management.
+  Employee Desk - Leave & Employee Management.
   React SPA on S3 + CloudFront, FastAPI on Lambda + API Gateway (HTTP API),
   MySQL on RDS, auth via Cognito, email via SES, scheduled jobs via EventBridge.
 
@@ -52,9 +52,9 @@ Resources:
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true # accounts are provisioned by HR from the app
         InviteMessageTemplate:
-          EmailSubject: Your LeaveDesk account
+          EmailSubject: Your Employee Desk account
           EmailMessage: >-
-            Welcome to LeaveDesk! Sign in with username {username} and temporary password {####}.
+            Welcome to Employee Desk! Sign in with username {username} and temporary password {####}.
             You'll be asked to choose a new password. Your HR team will share the app link.
       Policies:
         PasswordPolicy:
@@ -172,7 +172,7 @@ Resources:
           DB_NAME: leave_mgmt
           EMAIL_ENABLED: "true"
           SES_REGION: !Ref AWS::Region
-          SES_SENDER: !Sub LeaveDesk <${SenderEmail}>
+          SES_SENDER: !Sub Employee Desk <${SenderEmail}>
           FRONTEND_URL_PARAM: !Sub /leavedesk/${Stage}/app-url
           CORS_ORIGINS: http://localhost:5173
       Policies:
@@ -280,7 +280,7 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: !Sub LeaveDesk ${Stage}
+        Comment: !Sub Employee Desk ${Stage}
         DefaultRootObject: index.html
         HttpVersion: http2and3
         PriceClass: PriceClass_200
@@ -313,7 +313,7 @@ Resources:
 
 Outputs:
   AppUrl:
-    Description: LeaveDesk web app
+    Description: Employee Desk web app
     Value: !Sub https://${Distribution.DomainName}
   ApiUrl:
     Description: Direct API Gateway URL
